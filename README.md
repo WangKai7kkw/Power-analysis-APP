@@ -4,7 +4,7 @@ An interactive R Shiny web application for statistical power analysis of researc
 
 ## Live App
 
-The app is deployed at: [https://lxxkwa.shinyapps.io/power_analyses_app/](https://lxxkwa.shinyapps.io/power_analyses_app/)
+The app is deployed at: [https://wangkai.shinyapps.io/power_analyses_app/](https://wangkai.shinyapps.io/power_analyses_app/)
 
 ## Running Locally
 
