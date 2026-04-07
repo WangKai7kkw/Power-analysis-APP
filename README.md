@@ -6,6 +6,42 @@ An interactive R Shiny web application for statistical power analysis of researc
 
 The app is deployed at: [https://lxxkwa.shinyapps.io/power_analyses_app/](https://lxxkwa.shinyapps.io/power_analyses_app/)
 
+## Running Locally
+
+### Prerequisites
+
+- R (>= 4.0 recommended)
+- The following R packages:
+
+```r
+install.packages(c(
+  "shiny", "pwr4exp", "bslib", "rhandsontable",
+  "data.table", "shinyBS", "bsplus", "readxl", "rsconnect"
+))
+```
+
+### Launch the App
+
+```r
+shiny::runApp("app.R")
+```
+
+Or from within the repository directory:
+
+```r
+shiny::runApp()
+```
+
+## Citation
+
+If you use this app in your research, please cite the underlying `pwr4exp` package:
+
+```r
+citation("pwr4exp")
+```
+
+Wang K, Niu M (2024). *pwr4exp: Power Analysis for Research Experiments*. R package version 1.0.1. <https://github.com/an-ethz/pwr4exp>
+
 ## Overview
 
 The app supports power analysis for a variety of standard experimental designs and offers flexibility for more complex study designs. It calculates power for both F-tests and t-tests (including pairwise comparisons, polynomial contrasts, and custom contrasts).
@@ -63,32 +99,6 @@ In the **Power Calculation** panel:
 ### Step 5 – Run and Download
 
 Click **Power Calculation** to compute power. Results are displayed in the **Power Analysis Results** panel. Click **Download Results** to save the output.
-
-## Running Locally
-
-### Prerequisites
-
-- R (>= 4.0 recommended)
-- The following R packages:
-
-```r
-install.packages(c(
-  "shiny", "pwr4exp", "bslib", "rhandsontable",
-  "data.table", "shinyBS", "bsplus", "readxl", "rsconnect"
-))
-```
-
-### Launch the App
-
-```r
-shiny::runApp("app.R")
-```
-
-Or from within the repository directory:
-
-```r
-shiny::runApp()
-```
 
 ## Dependencies
 
