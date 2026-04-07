@@ -1,13 +1,16 @@
-Package: myShinyApp
 Type: Shiny
-Title: My Shiny App
+Title: pwr4exp Shiny App
 Version: 0.1.0
-Author: Your Name
-Description: A test app.
+Authors@R: c(
+    person("Ao", "Wang", role = c("aut"), email = "lxxkwa@163.com"),
+    person("Kai", "Wang", role = c("aut", "cre"), email = "kai.wang@usys.ethz.ch")
+  )
+Description: An interactive Shiny application built on the pwr4exp package.
+License: GPL (>= 2)
+Encoding: UTF-8
 Imports:
     shiny,
     pwr4exp,
-    dplyr,
     rhandsontable,
     bslib,
     data.table,
@@ -15,3 +18,5 @@ Imports:
     bsplus,
     readxl,
     rsconnect
+URL: https://github.com/WangKai7kkw/Power-analysis-APP
+BugReports: https://github.com/WangKai7kkw/Power-analysis-APP/issues
