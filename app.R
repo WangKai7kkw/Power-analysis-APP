@@ -1,5 +1,5 @@
 #### 
-packages <- c('pwr4exp','rhandsontable','shiny','bslib','data.table','shinyBS','bsplus','readxl','rsconnect')
+packages <- c('pwr4exp','rhandsontable','shiny','bslib','data.table','shinyBS','bsplus','readxl','rsconnect','nlme')
 for (p in packages) {
   if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
   library(p, character.only = TRUE)
@@ -554,21 +554,38 @@ server<-function(input,output,session) {
           
         div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
             div(style="flex:1;",
-            textInput("Correlation_general", "Input Correlation",
-                      placeholder = "e.g., corAR1(value=0.6,form =~fA|fC)",
-                      width = "100%")
+            selectInput(
+              "cor_type",
+              "Residual correlation structure",
+              choices = c(
+                "None" = "none",
+                "corAR1 \u2013 First-order autoregressive" = "corAR1",
+                "corARMA \u2013 Autoregressive moving average" = "corARMA",
+                "corCAR1 \u2013 Continuous-time autoregressive" = "corCAR1",
+                "corCompSymm \u2013 Compound symmetry" = "corCompSymm",
+                "corExp \u2013 Exponential spatial correlation" = "corExp",
+                "corGaus \u2013 Gaussian spatial correlation" = "corGaus",
+                "corLin \u2013 Linear spatial correlation" = "corLin",
+                "corSymm \u2013 Unstructured correlation" = "corSymm",
+                "corRatio \u2013 Ratio-based spatial correlation" = "corRatio",
+                "corSpher \u2013 Spherical spatial correlation" = "corSpher"
+              ),
+              selected = "none",
+              width = "100%"
+            )
             ),
-            
             tags$a(
               href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
-              target = "_blank",           
+              target = "_blank",
               `data-toggle` = "tooltip",
-              `data-bs-html` = "true", 
-              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",              style = "margin-left: 5px; cursor: pointer;",
+              `data-bs-html` = "true",
+              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",
               style = "margin-left: 8px; color: #000; font-size: 18px;",
               icon("question-circle")
             )
         ),
+        uiOutput("cor_params_ui"),
+        uiOutput("cor_validation_ui"),
         uiOutput('input_data_ui'),
         uiOutput('input_variance_ui'),
         tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
@@ -1092,7 +1109,7 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
+      tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
   
@@ -1573,7 +1590,7 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
+      tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
     req(page_started())
@@ -1699,7 +1716,7 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
+      tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
     req(page_started())
@@ -1867,6 +1884,337 @@ server<-function(input,output,session) {
     }
   })
   
+  # ── Correlation UI helpers ──────────────────────────────────────────────────
+
+  # Safe formula builder (no eval/parse)
+  make_cor_form <- function(rhs, group) {
+    if (!is.null(group) && nzchar(group))
+      stats::as.formula(paste0("~ ", rhs, " | ", group))
+    else
+      stats::as.formula(paste0("~ ", rhs))
+  }
+
+  # Dynamic parameter inputs that depend on the selected correlation type
+  output$cor_params_ui <- renderUI({
+    req(page_started())
+    req(input$cor_type)
+
+    if (input$cor_type == "none") return(NULL)
+
+    req(datavalues$uploaded_data)
+    cols <- colnames(datavalues$uploaded_data)
+
+    var_sel <- function(id, lbl, extra_none = FALSE) {
+      ch <- if (extra_none) c("None" = "", cols) else cols
+      sel <- if (extra_none) "" else cols[1]
+      selectInput(id, lbl, choices = ch, selected = sel, width = "100%")
+    }
+
+    group_sel <- var_sel("cor_group", "Grouping variable (optional; for ~ … | group)", extra_none = TRUE)
+
+    rho_slider <- sliderInput("cor_rho", "Correlation parameter (\u03c1)",
+                              min = -0.99, max = 0.99, value = 0.3, step = 0.01, width = "100%")
+
+    if (input$cor_type %in% c("corAR1", "corCAR1", "corCompSymm")) {
+      return(tagList(
+        var_sel("cor_time", "Time / order variable"),
+        group_sel,
+        rho_slider
+      ))
+    }
+
+    if (input$cor_type == "corARMA") {
+      return(tagList(
+        var_sel("cor_time", "Time / order variable"),
+        group_sel,
+        numericInput("cor_p", "AR order p", value = 1, min = 0, step = 1, width = "100%"),
+        numericInput("cor_q", "MA order q", value = 0, min = 0, step = 1, width = "100%"),
+        uiOutput("cor_arma_params_ui")
+      ))
+    }
+
+    if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      return(tagList(
+        selectInput("cor_dim", "Spatial coordinates",
+                    choices = c("1D: ~ x" = "1", "2D: ~ x + y" = "2", "3D: ~ x + y + z" = "3"),
+                    selected = "1", width = "100%"),
+        var_sel("cor_x", "Coordinate x"),
+        conditionalPanel("input.cor_dim >= '2'", var_sel("cor_y", "Coordinate y")),
+        conditionalPanel("input.cor_dim == '3'", var_sel("cor_z", "Coordinate z")),
+        group_sel,
+        numericInput("cor_range", "Range parameter", value = 1, min = 1e-6, step = 0.1, width = "100%"),
+        checkboxInput("cor_nugget", "Use nugget effect", value = FALSE)
+      ))
+    }
+
+    if (input$cor_type == "corSymm") {
+      return(tagList(
+        var_sel("cor_time", "Index variable (defines correlation levels)"),
+        group_sel,
+        tags$div(
+          style = "margin-top:6px; font-size:13px; color:#555;",
+          "Enter lower-triangle correlations in the table below (values in (-1, 1))."
+        ),
+        uiOutput("cor_symm_table_ui")
+      ))
+    }
+
+    NULL
+  })
+
+  # ARMA parameter vector inputs (general p + q)
+  output$cor_arma_params_ui <- renderUI({
+    req(page_started(), input$cor_type == "corARMA")
+    req(input$cor_p, input$cor_q)
+
+    p <- as.integer(input$cor_p)
+    q <- as.integer(input$cor_q)
+
+    if (is.na(p) || is.na(q) || p < 0 || q < 0)
+      return(tags$div(style = "color:#d9534f;", "p and q must be non-negative integers."))
+
+    k <- p + q
+    if (k == 0)
+      return(tags$div(style = "margin-top:6px; color:#555;",
+                      "p = 0 and q = 0: no ARMA parameters required."))
+
+    inputs <- lapply(seq_len(k), function(i) {
+      lab <- if (i <= p) paste0("AR parameter \u03c6", i) else paste0("MA parameter \u03b8", i - p)
+      numericInput(paste0("cor_arma_", i), lab, value = 0.1, min = -0.99, max = 0.99, step = 0.01, width = "100%")
+    })
+
+    tagList(tags$div(style = "margin-top:6px; font-weight:600;", "ARMA parameters"), inputs)
+  })
+
+  # corSymm: lower-triangle table UI
+  output$cor_symm_table_ui <- renderUI({
+    req(page_started(), input$cor_type == "corSymm")
+    req(datavalues$uploaded_data, input$cor_time)
+
+    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- as.character(lev[!is.na(lev)])
+    m   <- length(lev)
+
+    if (m < 2)
+      return(tags$div(style = "color:#d9534f; margin-top:6px;",
+                      "Need at least 2 levels in the index variable."))
+    if (m > 15)
+      return(tags$div(style = "color:#d9534f; margin-top:6px;",
+                      "Too many levels (> 15) for manual unstructured input. Consider another structure."))
+
+    rhandsontable::rHandsontableOutput("cor_symm_table")
+  })
+
+  output$cor_symm_table <- rhandsontable::renderRHandsontable({
+    req(page_started(), input$cor_type == "corSymm")
+    req(datavalues$uploaded_data, input$cor_time)
+
+    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- as.character(lev[!is.na(lev)])
+    m   <- length(lev)
+    req(m >= 2, m <= 15)
+
+    # Build lower-triangle numeric data frame; diagonal = 1, upper = NA (read-only)
+    mat <- matrix(NA_real_, nrow = m, ncol = m)
+    diag(mat) <- 1
+    df_mat <- as.data.frame(mat)
+    rownames(df_mat) <- lev
+    colnames(df_mat) <- lev
+
+    rh <- rhandsontable::rhandsontable(df_mat, rowHeaders = lev, width = "100%", height = 250) %>%
+      rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
+      rhandsontable::hot_cols(
+        renderer = "function(instance, td, row, col, prop, value, cellProperties) {
+          Handsontable.renderers.NumericRenderer.apply(this, arguments);
+          td.style.textAlign = 'center';
+        }"
+      )
+
+    for (r in seq_len(m)) {
+      for (c in seq_len(m)) {
+        if (r <= c) {                           # diagonal + upper triangle: read-only
+          rh <- rh %>% rhandsontable::hot_cell(row = r, col = c, readOnly = TRUE)
+        }
+      }
+    }
+    rh
+  })
+
+  # Validation feedback
+  output$cor_validation_ui <- renderUI({
+    req(page_started(), input$cor_type)
+    if (input$cor_type == "none") return(NULL)
+    req(datavalues$uploaded_data)
+
+    cols <- colnames(datavalues$uploaded_data)
+    msgs <- character(0)
+
+    # Time / index variable check (for non-spatial types)
+    if (input$cor_type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
+      t <- tryCatch(input$cor_time, error = function(e) NULL)
+      if (is.null(t) || !nzchar(t))
+        msgs <- c(msgs, "Please select a time/index variable.")
+      else if (!(t %in% cols))
+        msgs <- c(msgs, paste0("Time/index variable not found in data: ", t))
+    }
+
+    # Spatial coordinate checks
+    if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      x <- tryCatch(input$cor_x, error = function(e) NULL)
+      if (is.null(x) || !(x %in% cols))
+        msgs <- c(msgs, "Coordinate x not found in data.")
+      dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
+      if (!is.null(dim_val) && dim_val >= "2") {
+        y <- tryCatch(input$cor_y, error = function(e) NULL)
+        if (is.null(y) || !(y %in% cols))
+          msgs <- c(msgs, "Coordinate y not found in data.")
+      }
+      if (!is.null(dim_val) && dim_val == "3") {
+        z <- tryCatch(input$cor_z, error = function(e) NULL)
+        if (is.null(z) || !(z %in% cols))
+          msgs <- c(msgs, "Coordinate z not found in data.")
+      }
+    }
+
+    # Grouping variable (optional)
+    grp <- tryCatch(input$cor_group, error = function(e) NULL)
+    if (!is.null(grp) && nzchar(grp) && !(grp %in% cols))
+      msgs <- c(msgs, paste0("Grouping variable not found in data: ", grp))
+
+    # ARMA: p+q check
+    if (input$cor_type == "corARMA") {
+      p <- tryCatch(as.integer(input$cor_p), error = function(e) NA_integer_)
+      q <- tryCatch(as.integer(input$cor_q), error = function(e) NA_integer_)
+      if (is.na(p) || is.na(q) || p < 0 || q < 0)
+        msgs <- c(msgs, "p and q must be non-negative integers.")
+      else if (p == 0 && q == 0)
+        msgs <- c(msgs, "At least one of p or q must be > 0 for corARMA.")
+    }
+
+    if (length(msgs) > 0)
+      div(style = "color:#d9534f; margin-top:4px; font-size:13px;", paste(msgs, collapse = "  "))
+    else
+      div(style = "color:#28a745; margin-top:4px; font-size:13px;", "\u2713 Correlation settings look valid.")
+  })
+
+  # ── Build correlation object from safe whitelist ────────────────────────────
+  build_correlation <- function(df, type) {
+    if (is.null(type) || type == "none") return(NULL)
+
+    grp <- tryCatch(input$cor_group, error = function(e) "")
+    if (is.null(grp)) grp <- ""
+
+    # ── Time-series / non-spatial types ──────────────────────────────────────
+    if (type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
+      cov <- input$cor_time
+      df_model <- df
+      # Support factor time variable for AR1/ARMA by mapping to integer index
+      if (type %in% c("corAR1", "corARMA")) {
+        x <- df_model[[cov]]
+        if (!is.numeric(x)) {
+          df_model[[".cor_time_index"]] <- as.integer(factor(x))
+          time_rhs <- ".cor_time_index"
+        } else {
+          time_rhs <- cov
+        }
+      } else {
+        time_rhs <- cov
+      }
+
+      form <- make_cor_form(time_rhs, grp)
+
+      if (type == "corAR1") {
+        return(list(df_model = df_model,
+                    cor = nlme::corAR1(value = input$cor_rho, form = form)))
+      }
+      if (type == "corCAR1") {
+        return(list(df_model = df_model,
+                    cor = nlme::corCAR1(value = input$cor_rho, form = form)))
+      }
+      if (type == "corCompSymm") {
+        return(list(df_model = df_model,
+                    cor = nlme::corCompSymm(value = input$cor_rho, form = form)))
+      }
+      if (type == "corARMA") {
+        p <- as.integer(input$cor_p)
+        q <- as.integer(input$cor_q)
+        k <- p + q
+        vals <- if (k == 0) numeric(0) else {
+          sapply(seq_len(k), function(i) {
+            v <- input[[paste0("cor_arma_", i)]]
+            if (is.null(v)) 0 else as.numeric(v)
+          })
+        }
+        return(list(df_model = df_model,
+                    cor = nlme::corARMA(value = vals, p = p, q = q, form = form)))
+      }
+      if (type == "corSymm") {
+        # Read lower-triangle from rhandsontable
+        tbl <- tryCatch(rhandsontable::hot_to_r(input$cor_symm_table),
+                        error = function(e) NULL)
+        if (is.null(tbl))
+          stop("corSymm table not yet filled.")
+
+        lev <- unique(df_model[[cov]])
+        lev <- as.character(lev[!is.na(lev)])
+        m   <- length(lev)
+
+        mat <- matrix(0, nrow = m, ncol = m)
+        diag(mat) <- 1
+        for (r in seq_len(m)) {
+          for (c in seq_len(m)) {
+            if (r > c) {
+              val <- suppressWarnings(as.numeric(as.character(tbl[r, c])))
+              if (is.na(val) || abs(val) >= 1)
+                stop(paste0("Invalid correlation at (", lev[r], ", ", lev[c], "): must be in (-1, 1)."))
+              mat[r, c] <- val
+              mat[c, r] <- val
+            }
+          }
+        }
+        # Positive-definiteness check
+        eigs <- eigen(mat, symmetric = TRUE, only.values = TRUE)$values
+        if (any(eigs <= 0))
+          stop("The specified correlation matrix is not positive definite.")
+
+        # nlme::corSymm expects a vector of the lower triangle (col-major, below diagonal)
+        value_vec <- mat[lower.tri(mat)]
+
+        return(list(df_model = df_model,
+                    cor = nlme::corSymm(value = value_vec, form = form)))
+      }
+    }
+
+    # ── Spatial types ─────────────────────────────────────────────────────────
+    if (type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      rng <- as.numeric(input$cor_range)
+      nug <- isTRUE(input$cor_nugget)
+      dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
+      if (is.null(dim_val)) dim_val <- "1"
+
+      rhs <- if (dim_val == "3") {
+        paste0(input$cor_x, " + ", input$cor_y, " + ", input$cor_z)
+      } else if (dim_val == "2") {
+        paste0(input$cor_x, " + ", input$cor_y)
+      } else {
+        input$cor_x
+      }
+
+      form <- make_cor_form(rhs, grp)
+
+      cor_fun <- switch(type,
+        corExp   = nlme::corExp,
+        corGaus  = nlme::corGaus,
+        corLin   = nlme::corLin,
+        corRatio = nlme::corRatio,
+        corSpher = nlme::corSpher
+      )
+      return(list(df_model = df, cor = cor_fun(value = rng, form = form, nugget = nug)))
+    }
+
+    stop(paste0("Unsupported correlation type: ", type))
+  }
+
   output$test_options_ui<-renderUI({
     req(page_started())
     if(input$Type=='F-test'){
@@ -2927,7 +3275,7 @@ server<-function(input,output,session) {
         )
       }
     }else if(input$design_title=='General Design'){
-      req(input$uploaded_file,input$Formula_general,input$Correlation_general)  
+      req(input$uploaded_file, input$Formula_general)
       df<-datavalues$uploaded_data
 
       cols <- colnames(df)
@@ -2941,8 +3289,18 @@ server<-function(input,output,session) {
         }
       }
       formula_general<-as.formula(input$Formula_general)
-      correlation_general<-input$Correlation_general
-      
+
+      # Build correlation object safely (no eval/parse)
+      cor_result <- tryCatch(
+        build_correlation(df, input$cor_type),
+        error = function(e) {
+          showNotification(paste("Correlation error:", conditionMessage(e)), type = "error")
+          NULL
+        }
+      )
+      df_use   <- if (!is.null(cor_result)) cor_result$df_model else df
+      cor_obj  <- if (!is.null(cor_result)) cor_result$cor     else NULL
+
       variance_list <- values$variance
       values_variance <- c()
       
@@ -2965,26 +3323,19 @@ server<-function(input,output,session) {
       }
       
       values_sigma2<-values_variance[length(values_variance)]
-      
-      if(length(values_variance)>1){
-        values_vcomp<-values_variance[1:(length(values_variance)-1)]
-        crd<-mkdesign(
-          formula = formula_general,
-          data = df,
-          means = values_mean,
-          vcomp = values_vcomp,
-          sigma2 = values_sigma2,
-          correlation = eval(parse(text=correlation_general))
-        )
-      }else{
-        crd<-mkdesign(
-          formula = formula_general,
-          data = df,
-          means = values_mean,
-          sigma2 = values_sigma2,
-          correlation = eval(parse(text=correlation_general))
-        )
-      }
+
+      mk_args <- list(
+        formula = formula_general,
+        data    = df_use,
+        means   = values_mean,
+        sigma2  = values_sigma2
+      )
+      if (length(values_variance) > 1)
+        mk_args$vcomp <- values_variance[1:(length(values_variance) - 1)]
+      if (!is.null(cor_obj))
+        mk_args$correlation <- cor_obj
+
+      crd <- do.call(mkdesign, mk_args)
     }
     
     if(input$Type=='F-test'){
@@ -3394,7 +3745,7 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL),
+      tryCatch(input$cor_type,error=function(e) NULL),
       tryCatch(input$design_title,error=function(e) NULL)
     )
   }, {
