@@ -1953,7 +1953,7 @@ server<-function(input,output,session) {
         group_sel,
         tags$div(
           style = "margin-top:6px; font-size:13px; color:#555;",
-          "Enter lower-triangle correlations in the table below (values in (-1, 1))."
+          "Enter lower-triangle correlations in the table below (values strictly between -1 and 1, exclusive)."
         ),
         uiOutput("cor_symm_table_ui")
       ))
@@ -2166,7 +2166,7 @@ server<-function(input,output,session) {
             if (r > c) {
               val <- suppressWarnings(as.numeric(as.character(tbl[r, c])))
               if (is.na(val) || abs(val) >= 1)
-                stop(paste0("Invalid correlation at (", lev[r], ", ", lev[c], "): must be in (-1, 1)."))
+                stop(paste0("Invalid correlation at (", lev[r], ", ", lev[c], "): must be strictly between -1 and 1."))
               mat[r, c] <- val
               mat[c, r] <- val
             }
