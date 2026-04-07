@@ -1,5 +1,5 @@
 #### 
-packages <- c('pwr4exp','rhandsontable','shiny','bslib','data.table','shinyBS','bsplus','readxl','rsconnect')
+packages <- c('pwr4exp','rhandsontable','shiny','bslib','data.table','shinyBS','bsplus','readxl','rsconnect','nlme')
 for (p in packages) {
   if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
   library(p, character.only = TRUE)
@@ -286,18 +286,18 @@ server<-function(input,output,session) {
                border-radius: 6px; padding: 2px; margin-top: 2px;",
           tags$p("Treatments", 
                  style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
-        
+          
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                numericInput("num_trt", "Number of treatment factors", 
-                           value = 1, min = 1,width = '100%')
+                  numericInput("num_trt", "Number of treatment factors", 
+                               value = 1, min = 1,width = '100%')
               )
           ),
           div(style="margin-bottom: 2px;",
-            uiOutput("level_number_ui")
+              uiOutput("level_number_ui")
           )
         ),
-         
+        
         
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
@@ -307,12 +307,12 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_rep", "Number of replicates per treatment", 
-                           value = 8,min=1,width='100%')
+                  numericInput("num_rep", "Number of replicates per treatment", 
+                               value = 8,min=1,width='100%')
               )
           )
-          ),
-          
+        ),
+        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -322,13 +322,13 @@ server<-function(input,output,session) {
           uiOutput('model_ui'),
           uiOutput('interaction_exist_ui'),
           uiOutput('interaction_fac_ui')
-          ),
+        ),
         
-          uiOutput('input_data_ui'),
-          uiOutput('input_variance_ui'),
-
-          tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-
+        uiOutput('input_data_ui'),
+        uiOutput('input_variance_ui'),
+        
+        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+        
       )
     }else if(input$design_title=='Randomized Complete Block Design'){
       tagList(
@@ -340,15 +340,15 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_trt", "Number of treatment factors", 
-                           value = 1, min = 1,width = "100%")
+                  numericInput("num_trt", "Number of treatment factors", 
+                               value = 1, min = 1,width = "100%")
               )
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_number_ui")
           )
         ),
-          
+        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -357,11 +357,11 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_block", "Number of blocks", value = 8,min=1,width="100%")
+                  numericInput("num_block", "Number of blocks", value = 8,min=1,width="100%")
               )
-            )
-          ),
-          
+          )
+        ),
+        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -375,9 +375,9 @@ server<-function(input,output,session) {
         
         uiOutput('input_data_ui'),
         uiOutput('input_variance_ui'),
-          
+        
         tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-
+        
       )
     }else if(input$design_title=='Latin Square Design'){
       tagList(
@@ -389,15 +389,15 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_trt", "Number of treatment factors", 
-                           value = 1, min = 1,width = "100%")
+                  numericInput("num_trt", "Number of treatment factors", 
+                               value = 1, min = 1,width = "100%")
               )
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_number_ui")
           )
         ),
-          
+        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -406,21 +406,21 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_squares", "Number of replicated squares", value = 4,min=1,width = '100%')
+                  numericInput("num_squares", "Number of replicated squares", value = 4,min=1,width = '100%')
               )
           ),
           
           div(
             style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(
-                style='flex:1;',
-                selectInput(
-                  inputId = "value_reuse",
-                  label = "Reuse blocks",
-                  choices = c('row','col','none'),
-                  selected = "none",
-                  width = "100%")
-              ),
+            div(
+              style='flex:1;',
+              selectInput(
+                inputId = "value_reuse",
+                label = "Reuse blocks",
+                choices = c('row','col','none'),
+                selected = "none",
+                width = "100%")
+            ),
             tags$span(
               `data-toggle` = "tooltip",
               title = "Note: 'row' for reusing row blocks, 'col' for reusing column blocks, or 'none' for reusing neither row nor column blocks to replicate a single square.",
@@ -438,10 +438,10 @@ server<-function(input,output,session) {
           uiOutput('interaction_fac_ui'),
           uiOutput('model_ui')
         ),
-          uiOutput('input_data_ui'),
-          uiOutput('input_variance_ui'),
-          
-          tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+        uiOutput('input_data_ui'),
+        uiOutput('input_variance_ui'),
+        
+        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
       )
     }else if(input$design_title=='Split Plot Design'){
       tagList(
@@ -453,26 +453,26 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_trt_main", "Number of main plot factors", 
-                           value = 1, min = 1,width="100%")
+                  numericInput("num_trt_main", "Number of main plot factors", 
+                               value = 1, min = 1,width="100%")
               )
           ),
           
           div(style="margin-bottom: 2px;",
-            uiOutput("level_numbers_main_ui")
+              uiOutput("level_numbers_main_ui")
           ),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_trt_sub", "Number of sub plot factors",
-                           value = 1, min = 1,width="100%")
+                  numericInput("num_trt_sub", "Number of sub plot factors",
+                               value = 1, min = 1,width="100%")
               )
           ),
           div(style="margin-bottom: 2px;",
-            uiOutput("level_numbers_sub_ui")
+              uiOutput("level_numbers_sub_ui")
           )
-          ),
-          
+        ),
+        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -481,11 +481,11 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-              numericInput("num_rep", "Number of replicates (main plots) per main plot treatment", 
-                           value = 10,min=1,width="100%")
+                  numericInput("num_rep", "Number of replicates (main plots) per main plot treatment", 
+                               value = 10,min=1,width="100%")
               )
           )
-          ),
+        ),
         
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
@@ -497,11 +497,11 @@ server<-function(input,output,session) {
           uiOutput('interaction_fac_ui'),
           uiOutput('model_ui')
         ),
-          uiOutput('input_data_ui'),
-          uiOutput('input_variance_ui'),
-          
-          tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-          
+        uiOutput('input_data_ui'),
+        uiOutput('input_variance_ui'),
+        
+        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+        
       )
     }else if(input$design_title=='General Design'){
       tagList(
@@ -532,15 +532,15 @@ server<-function(input,output,session) {
               width = "100%")
           )
         ),
-          
+        
         uiOutput("file_feedback"),
         
         uiOutput("file_type_check"),
-          
+        
         div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
             div(style="flex:1;",
-            textInput("Formula_general", "Input Formula",
-                      placeholder = "e.g., ~ fA + fB",width = "100%")
+                textInput("Formula_general", "Input Formula",
+                          placeholder = "e.g., ~ fA + fB",width = "100%")
             ),
             tags$span(
               `data-toggle` = "tooltip",
@@ -550,29 +550,46 @@ server<-function(input,output,session) {
             )
         ),
         
-          uiOutput("level_numbers_validation3"),
-          
+        uiOutput("level_numbers_validation3"),
+        
         div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
             div(style="flex:1;",
-            textInput("Correlation_general", "Input Correlation",
-                      placeholder = "e.g., corAR1(value=0.6,form =~fA|fC)",
-                      width = "100%")
+                selectInput(
+                  "cor_type",
+                  "Residual correlation structure",
+                  choices = c(
+                    "None" = "none",
+                    "corAR1 \u2013 First-order autoregressive" = "corAR1",
+                    "corARMA \u2013 Autoregressive moving average" = "corARMA",
+                    "corCAR1 \u2013 Continuous-time autoregressive" = "corCAR1",
+                    "corCompSymm \u2013 Compound symmetry" = "corCompSymm",
+                    "corExp \u2013 Exponential spatial correlation" = "corExp",
+                    "corGaus \u2013 Gaussian spatial correlation" = "corGaus",
+                    "corLin \u2013 Linear spatial correlation" = "corLin",
+                    "corSymm \u2013 Unstructured correlation" = "corSymm",
+                    "corRatio \u2013 Ratio-based spatial correlation" = "corRatio",
+                    "corSpher \u2013 Spherical spatial correlation" = "corSpher"
+                  ),
+                  selected = "none",
+                  width = "100%"
+                )
             ),
-            
             tags$a(
               href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
-              target = "_blank",           
+              target = "_blank",
               `data-toggle` = "tooltip",
-              `data-bs-html` = "true", 
-              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",              style = "margin-left: 5px; cursor: pointer;",
+              `data-bs-html` = "true",
+              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",
               style = "margin-left: 8px; color: #000; font-size: 18px;",
               icon("question-circle")
             )
         ),
+        uiOutput("cor_params_ui"),
+        uiOutput("cor_validation_ui"),
         uiOutput('input_data_ui'),
         uiOutput('input_variance_ui'),
         tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-          
+        
       )
     }
   })
@@ -789,29 +806,29 @@ server<-function(input,output,session) {
     req(page_started())
     if (input$design_title == "General Design") {
       
-        output$file_feedback <- renderUI({
-          if (is.null(input$uploaded_file)) {
-            return(NULL)
-          }
-          req(input$uploaded_file)
-          
-          df <- datavalues$uploaded_data
-          
-          if (is.null(df)) {
-            tags$div(style = "color: red; font-weight: bold;margin-bottom: 10px;",
-                     "Please upload file.")
-          } else {
-            tags$div(style = "color: green; font-weight: bold;margin-bottom: 10px;",
-                     paste("File successfully uploaded with", nrow(df), "rows and", ncol(df), "columns."))
-          }
-        })
-      }
-    })
+      output$file_feedback <- renderUI({
+        if (is.null(input$uploaded_file)) {
+          return(NULL)
+        }
+        req(input$uploaded_file)
+        
+        df <- datavalues$uploaded_data
+        
+        if (is.null(df)) {
+          tags$div(style = "color: red; font-weight: bold;margin-bottom: 10px;",
+                   "Please upload file.")
+        } else {
+          tags$div(style = "color: green; font-weight: bold;margin-bottom: 10px;",
+                   paste("File successfully uploaded with", nrow(df), "rows and", ncol(df), "columns."))
+        }
+      })
+    }
+  })
   
   output$file_type_check<-renderUI({
     req(page_started())
     req(input$uploaded_file)
-
+    
     cols <- colnames(datavalues$uploaded_data)
     
     type_inputs <- lapply(seq_along(cols), function(i) {
@@ -819,12 +836,12 @@ server<-function(input,output,session) {
       tags$div(
         style = "display: flex; flex-direction: column; align-items: center;",
         
-          selectInput(
-            inputId = paste0("factor_type_", i),
-            label = col_name,
-            choices = c("Categorical", "Continuous"),
-            selected = "Categorical",
-            width = "160px"
+        selectInput(
+          inputId = paste0("factor_type_", i),
+          label = col_name,
+          choices = c("Categorical", "Continuous"),
+          selected = "Categorical",
+          width = "160px"
         )
       )
       
@@ -1092,21 +1109,47 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
+      tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
-  
-  output$model_ui<-renderUI({
-    req(page_started())
-
-    fac_formula <- NULL
-    if(!input$design_title %in% c('Split Plot Design','General Design')){
-      req(input$num_trt)
-      if(levels_num_trt() == 1){
-        fac_formula <- 'trt'
-      } else if(levels_num_trt() > 1){
+    
+    output$model_ui<-renderUI({
+      req(page_started())
+      
+      fac_formula <- NULL
+      if(!input$design_title %in% c('Split Plot Design','General Design')){
+        req(input$num_trt)
+        if(levels_num_trt() == 1){
+          fac_formula <- 'trt'
+        } else if(levels_num_trt() > 1){
+          req(input$interaction_option)
+          fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
+          if(input$interaction_option == 'No'){
+            fac_formula <- paste(fac_names, collapse = " + ")
+          } else if(input$interaction_option == 'Yes'){
+            if(is.null(input$interaction_formula)){
+              fac_formula <- paste(fac_names, collapse = " + ")
+            } else {
+              interaction_terms <- input$interaction_formula
+              interaction_terms <- unique(interaction_terms)
+              interaction_terms <- interaction_terms[order(interaction_terms)]
+              fac_formula <- paste(c(fac_names, interaction_terms), collapse = " + ")
+            }
+          }
+        }
+        if(input$design_title=='Randomized Complete Block Design'){
+          fac_formula<-paste0(fac_formula,' + ( 1 | block )')
+        }else if(input$design_title=='Latin Square Design'){
+          fac_formula<-paste0(fac_formula,' + ( 1 | row ) + ( 1 | col )')
+        }
+      } else if(input$design_title == 'Split Plot Design'){
+        req(input$num_trt_main)
+        req(input$num_trt_sub)
+        fac_names_main <- if(levels_num_trt_main() == 1) 'trt.main' else paste0("fac", LETTERS[1:levels_num_trt_main()], '.main')
+        fac_names_sub <- if(levels_num_trt_sub() == 1) 'trt.sub' else paste0("fac", LETTERS[1:levels_num_trt_sub()], '.sub')
+        fac_names <- c(fac_names_main, fac_names_sub)
+        
         req(input$interaction_option)
-        fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
         if(input$interaction_option == 'No'){
           fac_formula <- paste(fac_names, collapse = " + ")
         } else if(input$interaction_option == 'Yes'){
@@ -1120,82 +1163,56 @@ server<-function(input,output,session) {
           }
         }
       }
-      if(input$design_title=='Randomized Complete Block Design'){
-        fac_formula<-paste0(fac_formula,' + ( 1 | block )')
-      }else if(input$design_title=='Latin Square Design'){
-        fac_formula<-paste0(fac_formula,' + ( 1 | row ) + ( 1 | col )')
-      }
-    } else if(input$design_title == 'Split Plot Design'){
-      req(input$num_trt_main)
-      req(input$num_trt_sub)
-      fac_names_main <- if(levels_num_trt_main() == 1) 'trt.main' else paste0("fac", LETTERS[1:levels_num_trt_main()], '.main')
-      fac_names_sub <- if(levels_num_trt_sub() == 1) 'trt.sub' else paste0("fac", LETTERS[1:levels_num_trt_sub()], '.sub')
-      fac_names <- c(fac_names_main, fac_names_sub)
       
-      req(input$interaction_option)
-      if(input$interaction_option == 'No'){
-        fac_formula <- paste(fac_names, collapse = " + ")
-      } else if(input$interaction_option == 'Yes'){
-        if(is.null(input$interaction_formula)){
-          fac_formula <- paste(fac_names, collapse = " + ")
-        } else {
-          interaction_terms <- input$interaction_formula
-          interaction_terms <- unique(interaction_terms)
-          interaction_terms <- interaction_terms[order(interaction_terms)]
-          fac_formula <- paste(c(fac_names, interaction_terms), collapse = " + ")
-        }
-      }
-    }
-
-    note_text <- 
-      if(input$design_title=='Completely Randomized Design'){
-        paste0(
-          'Formula: ~ ', fac_formula,' + e', '<br>',
-          'Error variance: &sigma;<sup>2</sup> (e)'
-        )
-      } else if(input$design_title=='Randomized Complete Block Design'){
-        paste0(
-          'Formula: ~ ', fac_formula,' + e', '<br>',
-          'Block variance: &sigma;<sup>2</sup> (block)','<br>',
-          'Error variance: &sigma;<sup>2</sup> (e)'
-        )
-      } else if(input$design_title=='Latin Square Design'){
-        paste0(
-          'Formula: ~ ', fac_formula,' + e', '<br>',
-          'Row variance: &sigma;<sup>2</sup> (row)','<br>',
-          'Col variance: &sigma;<sup>2</sup> (col)','<br>',
-          'Error variance: &sigma;<sup>2</sup> (e)'
-        )
-      } else if(input$design_title=='Split Plot Design'){
-        paste0(
-          'Formula: ~ ', fac_formula,' + e', '<br>',
-          'Mainplot variance: &sigma;<sup>2</sup> (mainplot)','<br>',
-          'Error variance: &sigma;<sup>2</sup> (e)'
-        )
-      } 
-    bslib::card(
-      style = "background-color: #f8f9fa; border: 1px solid #ddd; 
+      note_text <- 
+        if(input$design_title=='Completely Randomized Design'){
+          paste0(
+            'Formula: ~ ', fac_formula,' + e', '<br>',
+            'Error variance: &sigma;<sup>2</sup> (e)'
+          )
+        } else if(input$design_title=='Randomized Complete Block Design'){
+          paste0(
+            'Formula: ~ ', fac_formula,' + e', '<br>',
+            'Block variance: &sigma;<sup>2</sup> (block)','<br>',
+            'Error variance: &sigma;<sup>2</sup> (e)'
+          )
+        } else if(input$design_title=='Latin Square Design'){
+          paste0(
+            'Formula: ~ ', fac_formula,' + e', '<br>',
+            'Row variance: &sigma;<sup>2</sup> (row)','<br>',
+            'Col variance: &sigma;<sup>2</sup> (col)','<br>',
+            'Error variance: &sigma;<sup>2</sup> (e)'
+          )
+        } else if(input$design_title=='Split Plot Design'){
+          paste0(
+            'Formula: ~ ', fac_formula,' + e', '<br>',
+            'Mainplot variance: &sigma;<sup>2</sup> (mainplot)','<br>',
+            'Error variance: &sigma;<sup>2</sup> (e)'
+          )
+        } 
+      bslib::card(
+        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
              border-radius: 8px; padding: 6px; margin-top: 4px;",
-      div(
-        style = "display: flex; align-items: center; gap: 8px;",
-        
-        # 左侧黑色竖条
         div(
-          style = "width: 4px; align-self: stretch; background-color: #000; border-radius: 2px;"
-        ),
-        
-        # note_text 内容
-        div(
-          HTML(paste0(
-            '<p style="font-size: 16px; color: #333; margin: 0;">',
-            note_text,
-            '</p>'
-          )),
-          style = "flex: 1;"
+          style = "display: flex; align-items: center; gap: 8px;",
+          
+          # 左侧黑色竖条
+          div(
+            style = "width: 4px; align-self: stretch; background-color: #000; border-radius: 2px;"
+          ),
+          
+          # note_text 内容
+          div(
+            HTML(paste0(
+              '<p style="font-size: 16px; color: #333; margin: 0;">',
+              note_text,
+              '</p>'
+            )),
+            style = "flex: 1;"
+          )
         )
       )
-      )
-  })
+    })
   })
   
   output$interaction_formula_hint <- renderUI({
@@ -1250,7 +1267,7 @@ server<-function(input,output,session) {
     req(input$num_trt_sub)
     as.numeric(input$num_trt_sub)
   })
-
+  
   interaction_formula_number<-reactive({
     req(page_started())
     req(input$interaction_formula)
@@ -1289,8 +1306,8 @@ server<-function(input,output,session) {
     if(input$design_title=="Completely Randomized Design"){
       req(input$num_trt)
       if(min(levels_vec())==1){
-          values$data<-NULL
-          values$variance<-NULL
+        values$data<-NULL
+        values$variance<-NULL
       }else{
         if(levels_num_trt()==1&min(levels_vec())>1){
           crd<-designCRD(
@@ -1556,7 +1573,7 @@ server<-function(input,output,session) {
       })
     }
   }, ignoreNULL = FALSE)
-
+  
   observeEvent({
     list(
       tryCatch(input$design_title,error=function(e) NULL),
@@ -1573,238 +1590,238 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
+      tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
     req(page_started())
-  output$input_data_ui <- renderUI({
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$num_trt)
-      note_text <- if (input$num_trt>=2) {
-        req(input$interaction_option)
-        if(input$interaction_option=='Yes'){
-          "Please provide cell means of all combinations."
-        } else if (input$interaction_option == "No") {
+    output$input_data_ui <- renderUI({
+      if(!input$design_title%in%c('Split Plot Design','General Design')){
+        req(input$num_trt)
+        note_text <- if (input$num_trt>=2) {
+          req(input$interaction_option)
+          if(input$interaction_option=='Yes'){
+            "Please provide cell means of all combinations."
+          } else if (input$interaction_option == "No") {
+            "Please provide marginal means of each factor."
+          } 
+        } else if(input$num_trt<=1) {
           "Please provide marginal means of each factor."
-        } 
-      } else if(input$num_trt<=1) {
-        "Please provide marginal means of each factor."
-      }
-
-    }else if(input$design_title=='Split Plot Design'){
-      req(input$num_trt_main)
-      req(input$num_trt_sub)
-      req(input$interaction_option)
-    
-      note_text <- if(input$interaction_option=='Yes'){
-          "Please provide cell means of all combinations."
-        } else if (input$interaction_option == "No") {
-          "Please provide marginal means of each factor."
-        } 
-    }else if(input$design_title=='General Design'){
-      req(datavalues$uploaded_data)
-      note_text<-NULL
-    }
-    
-    if(input$design_title!='General Design'){
-    bslib::card(
-      style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-      tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
-      tags$p(note_text, style = "font-size: 15px; color: #333; margin: 0;"),
-      uiOutput('design_table_ui')
-    )
-    }else if(input$design_title=='General Design'){
-      bslib::card(
-        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-        tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
-        tags$p("Please provide means.", style = "font-size: 15px; color: #333; margin: 0;"),
-        uiOutput('design_table_ui')
-      )
-    }
-  })
-  
-  output$design_table_ui <- renderUI({
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$level_numbers)
-      req(input$num_trt)
-    }else if(input$design_title=='Split Plot Design'){
-      req(input$level_numbers_main)
-      req(input$num_trt_main)
-      req(input$level_numbers_sub)
-      req(input$num_trt_sub)
-    }else if(input$design_title=='General Design'){
-      req(datavalues$uploaded_data)
-    }
-    if (is.null(values$data)) {
-      return(
-        div(
-          style = "height: 180px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
-          tags$em("No data available")
-        )
-      )
-    }else{
-      rhandsontable::rHandsontableOutput("design_table")
-    }
-  })
-  
-  output$design_table <- rhandsontable::renderRHandsontable({
-    req(values$data)
-    
-    df <- as.data.frame(values$data)
-    
-    col_widths <- pmax(160, nchar(colnames(df))) 
-    row_name_width <- max(nchar(rownames(df))) * 10+5
-    
-    rhandsontable::rhandsontable(
-      df,
-      rowHeaders = row.names(df),
-      colHeaders = colnames(df),
-      stretchH = "all",
-      height = 180,
-      colWidths = col_widths,
-      rowHeaderWidth = row_name_width,
-      digits = 2
-    ) %>%
-      rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
-      rhandsontable::hot_cols(
-        renderer = "function(instance, td, row, col, prop, value, cellProperties) {
-        Handsontable.renderers.NumericRenderer.apply(this, arguments);
-        td.style.textAlign = 'center';
-        if (value === null || value === undefined || value === '') {
-          td.style.background = '#FFF9E6';
         }
-      }"
-      )
-  })
-  })
-  
-  observeEvent({
-    list(
-      tryCatch(input$design_title,error=function(e) NULL),
-      tryCatch(levels_vec(), error = function(e) NULL),
-      tryCatch(levels_num_trt(), error = function(e) NULL),
-      tryCatch(input$num_rep, error = function(e) NULL),
-      tryCatch(interaction_option_number(), error = function(e) NULL),
-      tryCatch(interaction_formula_number(), error = function(e) NULL),
+        
+      }else if(input$design_title=='Split Plot Design'){
+        req(input$num_trt_main)
+        req(input$num_trt_sub)
+        req(input$interaction_option)
+        
+        note_text <- if(input$interaction_option=='Yes'){
+          "Please provide cell means of all combinations."
+        } else if (input$interaction_option == "No") {
+          "Please provide marginal means of each factor."
+        } 
+      }else if(input$design_title=='General Design'){
+        req(datavalues$uploaded_data)
+        note_text<-NULL
+      }
       
-      tryCatch(levels_num_trt_main(), error = function(e) NULL),
-      tryCatch(levels_num_trt_sub(), error = function(e) NULL),
-      tryCatch(levels_vec_main(), error = function(e) NULL),
-      tryCatch(levels_vec_sub(), error = function(e) NULL),
-      tryCatch(input$Formula_general,error=function(e) NULL),
-      tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL)
-    )
-  }, {
-    req(page_started())
-  output$input_variance_ui <- renderUI({
-    
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$num_trt)
-      
-    }else if(input$design_title=='Split Plot Design'){
-      req(input$num_trt_main)
-      req(input$num_trt_sub)
-
-    }else if(input$design_title=='General Design'){
-      req(datavalues$uploaded_data)
-    }
-
+      if(input$design_title!='General Design'){
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                  border-radius: 8px; padding: 10px; margin-top: 8px;
-                  height: 240px; display: flex; flex-direction: column;",
-          tags$p("Variance",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
-          div(
-            style = "flex: 0 0 auto; overflow-y: auto;",
-            uiOutput('design_variance_table_ui')
-          )
+                border-radius: 8px; padding: 10px; margin-top: 8px;
+                height: 300px; overflow-y: auto;",
+          tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
+          tags$p(note_text, style = "font-size: 15px; color: #333; margin: 0;"),
+          uiOutput('design_table_ui')
         )
-  })
-  
-  output$design_variance_table_ui <- renderUI({
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$level_numbers)
-      req(input$num_trt)
-    }else if(input$design_title=='Split Plot Design'){
-      req(input$level_numbers_main)
-      req(input$num_trt_main)
-      req(input$level_numbers_sub)
-      req(input$num_trt_sub)
-    }else if(input$design_title=='General Design'){
-      req(datavalues$uploaded_data)
-    }
-    if (is.null(values$variance)) {
-      return(
-        div(
-          style = "height: 100px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
-          tags$em("No data available")
+      }else if(input$design_title=='General Design'){
+        bslib::card(
+          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
+                border-radius: 8px; padding: 10px; margin-top: 8px;
+                height: 300px; overflow-y: auto;",
+          tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
+          tags$p("Please provide means.", style = "font-size: 15px; color: #333; margin: 0;"),
+          uiOutput('design_table_ui')
         )
-      )
-    }else{
-      if(input$design_title!="General Design"){
-        rhandsontable::rHandsontableOutput("design_variance_table")
-      }else if(input$design_title=="General Design"){
-        variance_list <- values$variance
-        
-        tables_ui <- lapply(seq_along(variance_list), function(i) {
-          tags$div(
-            style = "margin-bottom: 15px;",
-            tags$h4(style = "font-weight: bold; margin-bottom: 8px;",
-                    variance_list[[i]][1, 1]),
-            rHandsontableOutput(paste0("design_variance_table_", i))
-          )
-        })
-        
-        do.call(tagList, tables_ui)
       }
-    }
-  })
-  
-  output$design_variance_table <- rhandsontable::renderRHandsontable({
-    req(values$variance)
-    req(input$design_title != "General Design")
-
-    df <- as.data.frame(values$variance)
+    })
+    
+    output$design_table_ui <- renderUI({
+      if(!input$design_title%in%c('Split Plot Design','General Design')){
+        req(input$level_numbers)
+        req(input$num_trt)
+      }else if(input$design_title=='Split Plot Design'){
+        req(input$level_numbers_main)
+        req(input$num_trt_main)
+        req(input$level_numbers_sub)
+        req(input$num_trt_sub)
+      }else if(input$design_title=='General Design'){
+        req(datavalues$uploaded_data)
+      }
+      if (is.null(values$data)) {
+        return(
+          div(
+            style = "height: 180px; border: 1px solid #ddd; background-color: #f9f9f9; 
+                 display: flex; align-items: center; justify-content: center;",
+            tags$em("No data available")
+          )
+        )
+      }else{
+        rhandsontable::rHandsontableOutput("design_table")
+      }
+    })
+    
+    output$design_table <- rhandsontable::renderRHandsontable({
+      req(values$data)
       
-    col_widths <- pmax(140, nchar(colnames(df))) 
-    row_name_width <- max(nchar(rownames(df))) * 10
+      df <- as.data.frame(values$data)
       
-    rhandsontable::rhandsontable(
-      df,
-      rowHeaders = row.names(df),
-      colHeaders = colnames(df),
-      stretchH = "all",
-      height = 100,
-      colWidths = col_widths,
-      rowHeaderWidth = row_name_width,
-      digits = 2
-    ) %>%
-      rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
-      rhandsontable::hot_cols(
-        renderer = "function(instance, td, row, col, prop, value, cellProperties) {
+      col_widths <- pmax(160, nchar(colnames(df))) 
+      row_name_width <- max(nchar(rownames(df))) * 10+5
+      
+      rhandsontable::rhandsontable(
+        df,
+        rowHeaders = row.names(df),
+        colHeaders = colnames(df),
+        stretchH = "all",
+        height = 180,
+        colWidths = col_widths,
+        rowHeaderWidth = row_name_width,
+        digits = 2
+      ) %>%
+        rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
+        rhandsontable::hot_cols(
+          renderer = "function(instance, td, row, col, prop, value, cellProperties) {
         Handsontable.renderers.NumericRenderer.apply(this, arguments);
         td.style.textAlign = 'center';
         if (value === null || value === undefined || value === '') {
           td.style.background = '#FFF9E6';
         }
       }"
-    )
+        )
+    })
   })
+  
+  observeEvent({
+    list(
+      tryCatch(input$design_title,error=function(e) NULL),
+      tryCatch(levels_vec(), error = function(e) NULL),
+      tryCatch(levels_num_trt(), error = function(e) NULL),
+      tryCatch(input$num_rep, error = function(e) NULL),
+      tryCatch(interaction_option_number(), error = function(e) NULL),
+      tryCatch(interaction_formula_number(), error = function(e) NULL),
+      
+      tryCatch(levels_num_trt_main(), error = function(e) NULL),
+      tryCatch(levels_num_trt_sub(), error = function(e) NULL),
+      tryCatch(levels_vec_main(), error = function(e) NULL),
+      tryCatch(levels_vec_sub(), error = function(e) NULL),
+      tryCatch(input$Formula_general,error=function(e) NULL),
+      tryCatch(factor_types_number(),error=function(e) NULL),
+      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(input$cor_type,error=function(e) NULL)
+    )
+  }, {
+    req(page_started())
+    output$input_variance_ui <- renderUI({
+      
+      if(!input$design_title%in%c('Split Plot Design','General Design')){
+        req(input$num_trt)
+        
+      }else if(input$design_title=='Split Plot Design'){
+        req(input$num_trt_main)
+        req(input$num_trt_sub)
+        
+      }else if(input$design_title=='General Design'){
+        req(datavalues$uploaded_data)
+      }
+      
+      bslib::card(
+        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
+                  border-radius: 8px; padding: 10px; margin-top: 8px;
+                  height: 240px; display: flex; flex-direction: column;",
+        tags$p("Variance",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
+        div(
+          style = "flex: 0 0 auto; overflow-y: auto;",
+          uiOutput('design_variance_table_ui')
+        )
+      )
+    })
+    
+    output$design_variance_table_ui <- renderUI({
+      if(!input$design_title%in%c('Split Plot Design','General Design')){
+        req(input$level_numbers)
+        req(input$num_trt)
+      }else if(input$design_title=='Split Plot Design'){
+        req(input$level_numbers_main)
+        req(input$num_trt_main)
+        req(input$level_numbers_sub)
+        req(input$num_trt_sub)
+      }else if(input$design_title=='General Design'){
+        req(datavalues$uploaded_data)
+      }
+      if (is.null(values$variance)) {
+        return(
+          div(
+            style = "height: 100px; border: 1px solid #ddd; background-color: #f9f9f9; 
+                 display: flex; align-items: center; justify-content: center;",
+            tags$em("No data available")
+          )
+        )
+      }else{
+        if(input$design_title!="General Design"){
+          rhandsontable::rHandsontableOutput("design_variance_table")
+        }else if(input$design_title=="General Design"){
+          variance_list <- values$variance
+          
+          tables_ui <- lapply(seq_along(variance_list), function(i) {
+            tags$div(
+              style = "margin-bottom: 15px;",
+              tags$h4(style = "font-weight: bold; margin-bottom: 8px;",
+                      variance_list[[i]][1, 1]),
+              rHandsontableOutput(paste0("design_variance_table_", i))
+            )
+          })
+          
+          do.call(tagList, tables_ui)
+        }
+      }
+    })
+    
+    output$design_variance_table <- rhandsontable::renderRHandsontable({
+      req(values$variance)
+      req(input$design_title != "General Design")
+      
+      df <- as.data.frame(values$variance)
+      
+      col_widths <- pmax(140, nchar(colnames(df))) 
+      row_name_width <- max(nchar(rownames(df))) * 10
+      
+      rhandsontable::rhandsontable(
+        df,
+        rowHeaders = row.names(df),
+        colHeaders = colnames(df),
+        stretchH = "all",
+        height = 100,
+        colWidths = col_widths,
+        rowHeaderWidth = row_name_width,
+        digits = 2
+      ) %>%
+        rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
+        rhandsontable::hot_cols(
+          renderer = "function(instance, td, row, col, prop, value, cellProperties) {
+        Handsontable.renderers.NumericRenderer.apply(this, arguments);
+        td.style.textAlign = 'center';
+        if (value === null || value === undefined || value === '') {
+          td.style.background = '#FFF9E6';
+        }
+      }"
+        )
+    })
   })
   
   observe({
     req(page_started())
     req(input$design_title == "General Design")
     req(!is.null(values$variance))
-
+    
     variance_list <- values$variance
     
     for (i in seq_along(variance_list)) {
@@ -1866,6 +1883,337 @@ server<-function(input,output,session) {
       })
     }
   })
+  
+  # ── Correlation UI helpers ──────────────────────────────────────────────────
+  
+  # Safe formula builder (no eval/parse)
+  make_cor_form <- function(rhs, group) {
+    if (!is.null(group) && nzchar(group))
+      stats::as.formula(paste0("~ ", rhs, " | ", group))
+    else
+      stats::as.formula(paste0("~ ", rhs))
+  }
+  
+  # Dynamic parameter inputs that depend on the selected correlation type
+  output$cor_params_ui <- renderUI({
+    req(page_started())
+    req(input$cor_type)
+    
+    if (input$cor_type == "none") return(NULL)
+    
+    req(datavalues$uploaded_data)
+    cols <- colnames(datavalues$uploaded_data)
+    
+    var_sel <- function(id, lbl, extra_none = FALSE) {
+      ch <- if (extra_none) c("None" = "", cols) else cols
+      sel <- if (extra_none) "" else cols[1]
+      selectInput(id, lbl, choices = ch, selected = sel, width = "100%")
+    }
+    
+    group_sel <- var_sel("cor_group", "Grouping variable (optional; for ~ … | group)", extra_none = TRUE)
+    
+    rho_slider <- sliderInput("cor_rho", "Correlation parameter (\u03c1)",
+                              min = -0.99, max = 0.99, value = 0.3, step = 0.01, width = "100%")
+    
+    if (input$cor_type %in% c("corAR1", "corCAR1", "corCompSymm")) {
+      return(tagList(
+        var_sel("cor_time", "Time / order variable"),
+        group_sel,
+        rho_slider
+      ))
+    }
+    
+    if (input$cor_type == "corARMA") {
+      return(tagList(
+        var_sel("cor_time", "Time / order variable"),
+        group_sel,
+        numericInput("cor_p", "AR order p", value = 1, min = 0, step = 1, width = "100%"),
+        numericInput("cor_q", "MA order q", value = 0, min = 0, step = 1, width = "100%"),
+        uiOutput("cor_arma_params_ui")
+      ))
+    }
+    
+    if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      return(tagList(
+        selectInput("cor_dim", "Spatial coordinates",
+                    choices = c("1D: ~ x" = "1", "2D: ~ x + y" = "2", "3D: ~ x + y + z" = "3"),
+                    selected = "1", width = "100%"),
+        var_sel("cor_x", "Coordinate x"),
+        conditionalPanel("input.cor_dim >= '2'", var_sel("cor_y", "Coordinate y")),
+        conditionalPanel("input.cor_dim == '3'", var_sel("cor_z", "Coordinate z")),
+        group_sel,
+        numericInput("cor_range", "Range parameter", value = 1, min = 1e-6, step = 0.1, width = "100%"),
+        checkboxInput("cor_nugget", "Use nugget effect", value = FALSE)
+      ))
+    }
+    
+    if (input$cor_type == "corSymm") {
+      return(tagList(
+        var_sel("cor_time", "Index variable (defines correlation levels)"),
+        group_sel,
+        tags$div(
+          style = "margin-top:6px; font-size:13px; color:#555;",
+          "Enter lower-triangle correlations in the table below (values strictly between -1 and 1, exclusive)."
+        ),
+        uiOutput("cor_symm_table_ui")
+      ))
+    }
+    
+    NULL
+  })
+  
+  # ARMA parameter vector inputs (general p + q)
+  output$cor_arma_params_ui <- renderUI({
+    req(page_started(), input$cor_type == "corARMA")
+    req(input$cor_p, input$cor_q)
+    
+    p <- as.integer(input$cor_p)
+    q <- as.integer(input$cor_q)
+    
+    if (is.na(p) || is.na(q) || p < 0 || q < 0)
+      return(tags$div(style = "color:#d9534f;", "p and q must be non-negative integers."))
+    
+    k <- p + q
+    if (k == 0)
+      return(tags$div(style = "margin-top:6px; color:#555;",
+                      "p = 0 and q = 0: no ARMA parameters required."))
+    
+    inputs <- lapply(seq_len(k), function(i) {
+      lab <- if (i <= p) paste0("AR parameter \u03c6", i) else paste0("MA parameter \u03b8", i - p)
+      numericInput(paste0("cor_arma_", i), lab, value = 0.1, min = -0.99, max = 0.99, step = 0.01, width = "100%")
+    })
+    
+    tagList(tags$div(style = "margin-top:6px; font-weight:600;", "ARMA parameters"), inputs)
+  })
+  
+  # corSymm: lower-triangle table UI
+  output$cor_symm_table_ui <- renderUI({
+    req(page_started(), input$cor_type == "corSymm")
+    req(datavalues$uploaded_data, input$cor_time)
+    
+    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- as.character(lev[!is.na(lev)])
+    m   <- length(lev)
+    
+    if (m < 2)
+      return(tags$div(style = "color:#d9534f; margin-top:6px;",
+                      "Need at least 2 levels in the index variable."))
+    if (m > 15)
+      return(tags$div(style = "color:#d9534f; margin-top:6px;",
+                      "Too many levels (> 15) for manual unstructured input. Consider another structure."))
+    
+    rhandsontable::rHandsontableOutput("cor_symm_table")
+  })
+  
+  output$cor_symm_table <- rhandsontable::renderRHandsontable({
+    req(page_started(), input$cor_type == "corSymm")
+    req(datavalues$uploaded_data, input$cor_time)
+    
+    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- as.character(lev[!is.na(lev)])
+    m   <- length(lev)
+    req(m >= 2, m <= 15)
+    
+    # Build lower-triangle numeric data frame; diagonal = 1, upper = NA (read-only)
+    mat <- matrix(NA_real_, nrow = m, ncol = m)
+    diag(mat) <- 1
+    df_mat <- as.data.frame(mat)
+    rownames(df_mat) <- lev
+    colnames(df_mat) <- lev
+    
+    rh <- rhandsontable::rhandsontable(df_mat, rowHeaders = lev, width = "100%", height = 250) %>%
+      rhandsontable::hot_table(highlightCol = TRUE, highlightRow = TRUE) %>%
+      rhandsontable::hot_cols(
+        renderer = "function(instance, td, row, col, prop, value, cellProperties) {
+          Handsontable.renderers.NumericRenderer.apply(this, arguments);
+          td.style.textAlign = 'center';
+        }"
+      )
+    
+    for (r in seq_len(m)) {
+      for (c in seq_len(m)) {
+        if (r <= c) {                           # diagonal + upper triangle: read-only
+          rh <- rh %>% rhandsontable::hot_cell(row = r, col = c, readOnly = TRUE)
+        }
+      }
+    }
+    rh
+  })
+  
+  # Validation feedback
+  output$cor_validation_ui <- renderUI({
+    req(page_started(), input$cor_type)
+    if (input$cor_type == "none") return(NULL)
+    req(datavalues$uploaded_data)
+    
+    cols <- colnames(datavalues$uploaded_data)
+    msgs <- character(0)
+    
+    # Time / index variable check (for non-spatial types)
+    if (input$cor_type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
+      t <- tryCatch(input$cor_time, error = function(e) NULL)
+      if (is.null(t) || !nzchar(t))
+        msgs <- c(msgs, "Please select a time/index variable.")
+      else if (!(t %in% cols))
+        msgs <- c(msgs, paste0("Time/index variable not found in data: ", t))
+    }
+    
+    # Spatial coordinate checks
+    if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      x <- tryCatch(input$cor_x, error = function(e) NULL)
+      if (is.null(x) || !(x %in% cols))
+        msgs <- c(msgs, "Coordinate x not found in data.")
+      dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
+      if (!is.null(dim_val) && dim_val >= "2") {
+        y <- tryCatch(input$cor_y, error = function(e) NULL)
+        if (is.null(y) || !(y %in% cols))
+          msgs <- c(msgs, "Coordinate y not found in data.")
+      }
+      if (!is.null(dim_val) && dim_val == "3") {
+        z <- tryCatch(input$cor_z, error = function(e) NULL)
+        if (is.null(z) || !(z %in% cols))
+          msgs <- c(msgs, "Coordinate z not found in data.")
+      }
+    }
+    
+    # Grouping variable (optional)
+    grp <- tryCatch(input$cor_group, error = function(e) NULL)
+    if (!is.null(grp) && nzchar(grp) && !(grp %in% cols))
+      msgs <- c(msgs, paste0("Grouping variable not found in data: ", grp))
+    
+    # ARMA: p+q check
+    if (input$cor_type == "corARMA") {
+      p <- tryCatch(as.integer(input$cor_p), error = function(e) NA_integer_)
+      q <- tryCatch(as.integer(input$cor_q), error = function(e) NA_integer_)
+      if (is.na(p) || is.na(q) || p < 0 || q < 0)
+        msgs <- c(msgs, "p and q must be non-negative integers.")
+      else if (p == 0 && q == 0)
+        msgs <- c(msgs, "At least one of p or q must be > 0 for corARMA.")
+    }
+    
+    if (length(msgs) > 0)
+      div(style = "color:#d9534f; margin-top:4px; font-size:13px;", paste(msgs, collapse = "  "))
+    else
+      div(style = "color:#28a745; margin-top:4px; font-size:13px;", "\u2713 Correlation settings look valid.")
+  })
+  
+  # ── Build correlation object from safe whitelist ────────────────────────────
+  build_correlation <- function(df, type) {
+    if (is.null(type) || type == "none") return(NULL)
+    
+    grp <- tryCatch(input$cor_group, error = function(e) "")
+    if (is.null(grp)) grp <- ""
+    
+    # ── Time-series / non-spatial types ──────────────────────────────────────
+    if (type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
+      cov <- input$cor_time
+      df_model <- df
+      # Support factor time variable for AR1/ARMA by mapping to integer index
+      if (type %in% c("corAR1", "corARMA")) {
+        x <- df_model[[cov]]
+        if (!is.numeric(x)) {
+          df_model[[".cor_time_index"]] <- as.integer(factor(x))
+          time_rhs <- ".cor_time_index"
+        } else {
+          time_rhs <- cov
+        }
+      } else {
+        time_rhs <- cov
+      }
+      
+      form <- make_cor_form(time_rhs, grp)
+      
+      if (type == "corAR1") {
+        return(list(df_model = df_model,
+                    cor = nlme::corAR1(value = input$cor_rho, form = form)))
+      }
+      if (type == "corCAR1") {
+        return(list(df_model = df_model,
+                    cor = nlme::corCAR1(value = input$cor_rho, form = form)))
+      }
+      if (type == "corCompSymm") {
+        return(list(df_model = df_model,
+                    cor = nlme::corCompSymm(value = input$cor_rho, form = form)))
+      }
+      if (type == "corARMA") {
+        p <- as.integer(input$cor_p)
+        q <- as.integer(input$cor_q)
+        k <- p + q
+        vals <- if (k == 0) numeric(0) else {
+          sapply(seq_len(k), function(i) {
+            v <- input[[paste0("cor_arma_", i)]]
+            if (is.null(v)) 0 else as.numeric(v)
+          })
+        }
+        return(list(df_model = df_model,
+                    cor = nlme::corARMA(value = vals, p = p, q = q, form = form)))
+      }
+      if (type == "corSymm") {
+        # Read lower-triangle from rhandsontable
+        tbl <- tryCatch(rhandsontable::hot_to_r(input$cor_symm_table),
+                        error = function(e) NULL)
+        if (is.null(tbl))
+          stop("corSymm table not yet filled.")
+        
+        lev <- unique(df_model[[cov]])
+        lev <- as.character(lev[!is.na(lev)])
+        m   <- length(lev)
+        
+        mat <- matrix(0, nrow = m, ncol = m)
+        diag(mat) <- 1
+        for (r in seq_len(m)) {
+          for (c in seq_len(m)) {
+            if (r > c) {
+              val <- suppressWarnings(as.numeric(as.character(tbl[r, c])))
+              if (is.na(val) || abs(val) >= 1)
+                stop(paste0("Invalid correlation at (", lev[r], ", ", lev[c], "): must be strictly between -1 and 1."))
+              mat[r, c] <- val
+              mat[c, r] <- val
+            }
+          }
+        }
+        # Positive-definiteness check
+        eigs <- eigen(mat, symmetric = TRUE, only.values = TRUE)$values
+        if (any(eigs <= 0))
+          stop("The specified correlation matrix is not positive definite.")
+        
+        # nlme::corSymm expects a vector of the lower triangle (col-major, below diagonal)
+        value_vec <- mat[lower.tri(mat)]
+        
+        return(list(df_model = df_model,
+                    cor = nlme::corSymm(value = value_vec, form = form)))
+      }
+    }
+    
+    # ── Spatial types ─────────────────────────────────────────────────────────
+    if (type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      rng <- as.numeric(input$cor_range)
+      nug <- isTRUE(input$cor_nugget)
+      dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
+      if (is.null(dim_val)) dim_val <- "1"
+      
+      rhs <- if (dim_val == "3") {
+        paste0(input$cor_x, " + ", input$cor_y, " + ", input$cor_z)
+      } else if (dim_val == "2") {
+        paste0(input$cor_x, " + ", input$cor_y)
+      } else {
+        input$cor_x
+      }
+      
+      form <- make_cor_form(rhs, grp)
+      
+      cor_fun <- switch(type,
+                        corExp   = nlme::corExp,
+                        corGaus  = nlme::corGaus,
+                        corLin   = nlme::corLin,
+                        corRatio = nlme::corRatio,
+                        corSpher = nlme::corSpher
+      )
+      return(list(df_model = df, cor = cor_fun(value = rng, form = form, nugget = nug)))
+    }
+    
+    stop(paste0("Unsupported correlation type: ", type))
+  }
   
   output$test_options_ui<-renderUI({
     req(page_started())
@@ -1950,7 +2298,7 @@ server<-function(input,output,session) {
                 })
             )
           ),
-
+          
           if(!is.null(input$Contrast) && input$Contrast == 'Contrast vector'){
             tagList(
               div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
@@ -1961,7 +2309,7 @@ server<-function(input,output,session) {
                               placeholder = "e.g., 1,-1",
                               width = "100%")
                   )
-                ),
+              ),
               tags$script(HTML('$(document).ready(function(){$("[data-toggle=\'tooltip\']").tooltip();});')),
               uiOutput("contrast_validation")
             )
@@ -2047,8 +2395,8 @@ server<-function(input,output,session) {
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
                 })
-              )
-            ),
+            )
+          ),
           
           if(!is.null(input$Contrast) && input$Contrast == 'Contrast vector'){
             tagList(
@@ -2171,8 +2519,8 @@ server<-function(input,output,session) {
                 selected = "Type III",
                 width = "100%"),
               sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
-              )
-            ),
+            )
+          ),
           if(input$num_trt>1){
             selected_which <- if (is.null(input$which_para)) "facA" else input$which_para
             div(
@@ -2214,8 +2562,8 @@ server<-function(input,output,session) {
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
                 })
-              )
-            ),
+            )
+          ),
           if(!is.null(input$Contrast) && input$Contrast == 'Contrast vector'){
             tagList(
               div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
@@ -2279,8 +2627,8 @@ server<-function(input,output,session) {
                 selected = "Type III",
                 width = "100%"),
               sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
-              )
-            ),
+            )
+          ),
           
           if(num_trt_main>=1){
             selected_which <- if (is.null(input$which_para)) generate_spd_factors(num_trt_main,num_trt_sub)[1] else input$which_para
@@ -2326,8 +2674,8 @@ server<-function(input,output,session) {
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
                 })
-              )
-            ),
+            )
+          ),
           
           if(!is.null(input$Contrast) && input$Contrast == 'Contrast vector'){
             tagList(
@@ -2375,8 +2723,8 @@ server<-function(input,output,session) {
                 selected = "Type III",
                 width = "100%"),
               sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
-              )
-            ),
+            )
+          ),
           
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
@@ -2570,7 +2918,7 @@ server<-function(input,output,session) {
           } else if (grepl("\\.sub$", fac)) {
             letter <- gsub("fac([A-Z]+)\\.sub", "\\1", fac)
             index <- match(letter, LETTERS)
-  
+            
             numbers_sub<-levels_vec_sub()
             
             recorded_numbers <- c(recorded_numbers, as.numeric(numbers_sub[index]))
@@ -2681,384 +3029,506 @@ server<-function(input,output,session) {
   observeEvent(input$create_result,{
     req(page_started())
     tryCatch({
-    output$results_display <- renderUI({
-      req(input$Type)
-      table_style <- "display: flex; justify-content: center; align-items: center; 
+      output$results_display <- renderUI({
+        req(input$Type)
+        table_style <- "display: flex; justify-content: center; align-items: center; 
                   padding: 20px; margin: 15px auto; width: 90%; 
                   background-color: #f9f9f9; border-radius: 10px; 
                   box-shadow: 0 2px 6px rgba(0,0,0,0.1);"
-      
-      if (input$Type == "F-test") {
-        return(
-          div(style = "display: flex; justify-content: center;",
-              div(style = table_style,
-                  tableOutput("power_omnibus_test"))
-          )
-        )
-      } else if (input$Type == "t-test") {
-        return(
-          div(style = "display: flex; justify-content: center;",
-              div(style = table_style,
-                  tableOutput("power_contrast"))
-          )
-        )
-      } else if (input$Type == "F-test & t-test") {
-        return(
-          div(style = "display: flex; flex-direction: column; align-items: center;",
-              div(style = table_style,
-                  tableOutput("power_omnibus_test")),
-              div(style = table_style,
-                  tableOutput("power_contrast"))
-          )
-        )
-      }
-    })
-    
-    req(values$data,values$variance,input$design_table)
-    
-    values_mean<-hot_to_r(input$design_table)
-    values_mean <- as.numeric(unlist(values_mean))
-    if(input$design_title=="Completely Randomized Design"){
-      values_variance<-hot_to_r(input$design_variance_table)
-      values_variance<-as.numeric(unlist(values_variance))
-      
-      if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-        showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
-                         type = "error", duration = 5)
-        return(NULL)
-      }else{
-      
-      if(levels_num_trt()==1){
-        crd <- designCRD(
-          treatments = levels_vec(),
-          replicates = input$num_rep,
-          means = values_mean,
-          sigma2 = values_variance
-        )
-      }else if(levels_num_trt()>1&interaction_option_number()=='No'){
-        fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
-        fac_formula <- paste(fac_names, collapse = "+")
-        crd <- designCRD(
-          treatments = levels_vec(),
-          replicates = input$num_rep,
-          formula=as.formula(paste0('~',fac_formula)),
-          means = values_mean,
-          sigma2 = values_variance
-        )
-      }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
-        fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
         
-        if(is.null(interaction_formula_number())){
-          fac_formula <- paste(fac_names, collapse = "+")
+        if (input$Type == "F-test") {
+          return(
+            div(style = "display: flex; justify-content: center;",
+                div(style = table_style,
+                    tableOutput("power_omnibus_test"))
+            )
+          )
+        } else if (input$Type == "t-test") {
+          return(
+            div(style = "display: flex; justify-content: center;",
+                div(style = table_style,
+                    tableOutput("power_contrast"))
+            )
+          )
+        } else if (input$Type == "F-test & t-test") {
+          return(
+            div(style = "display: flex; flex-direction: column; align-items: center;",
+                div(style = table_style,
+                    tableOutput("power_omnibus_test")),
+                div(style = table_style,
+                    tableOutput("power_contrast"))
+            )
+          )
+        }
+      })
+      
+      req(values$data,values$variance,input$design_table)
+      
+      values_mean<-hot_to_r(input$design_table)
+      values_mean <- as.numeric(unlist(values_mean))
+      if(input$design_title=="Completely Randomized Design"){
+        values_variance<-hot_to_r(input$design_variance_table)
+        values_variance<-as.numeric(unlist(values_variance))
+        
+        if (any(is.na(values_mean)) || any(is.na(values_variance))) {
+          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+                           type = "error", duration = 5)
+          return(NULL)
         }else{
-          interaction_terms <- interaction_formula_number()
-          interaction_terms<-unique(interaction_terms)
-          interaction_terms<-interaction_terms[order(interaction_terms)]
           
-          fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
-        }
-        crd <- designCRD(
-          treatments = levels_vec(),
-          replicates = input$num_rep,
-          formula=as.formula(paste0('~',fac_formula)),
-          means = values_mean,
-          sigma2 = values_variance
-        )
-      }
-      }
-    }else if(input$design_title=='Randomized Complete Block Design'){
-      values_variance<-hot_to_r(input$design_variance_table)
-      values_variance<-as.numeric(unlist(values_variance))
-      values_vcomp<-as.numeric(values_variance[1])
-      values_sigma2<-as.numeric(values_variance[2])
-      
-      if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-        showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
-                         type = "error", duration = 5)
-        return(NULL)
-      }else{
-        if(levels_num_trt()==1){
-          crd <- designRCBD(
-            treatments = levels_vec(),
-            blocks = input$num_block,
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
-        }else if(levels_num_trt()>1&interaction_option_number()=='No'){
-          fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
-          fac_formula <- paste(fac_names, collapse = "+")
-          
-          crd <- designRCBD(
-            treatments = levels_vec(),
-            blocks = input$num_block,
-            formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
-        }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
-          fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
-          
-          if(is.null(interaction_formula_number())){
+          if(levels_num_trt()==1){
+            crd <- designCRD(
+              treatments = levels_vec(),
+              replicates = input$num_rep,
+              means = values_mean,
+              sigma2 = values_variance
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='No'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             fac_formula <- paste(fac_names, collapse = "+")
-          }else{
-            interaction_terms <- interaction_formula_number()
-            interaction_terms<-unique(interaction_terms)
-            interaction_terms<-interaction_terms[order(interaction_terms)]
+            crd <- designCRD(
+              treatments = levels_vec(),
+              replicates = input$num_rep,
+              formula=as.formula(paste0('~',fac_formula)),
+              means = values_mean,
+              sigma2 = values_variance
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             
-            fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
+            if(is.null(interaction_formula_number())){
+              fac_formula <- paste(fac_names, collapse = "+")
+            }else{
+              interaction_terms <- interaction_formula_number()
+              interaction_terms<-unique(interaction_terms)
+              interaction_terms<-interaction_terms[order(interaction_terms)]
+              
+              fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
+            }
+            crd <- designCRD(
+              treatments = levels_vec(),
+              replicates = input$num_rep,
+              formula=as.formula(paste0('~',fac_formula)),
+              means = values_mean,
+              sigma2 = values_variance
+            )
           }
-          crd <- designRCBD(
-            treatments = levels_vec(),
-            blocks = input$num_block,
-            formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
         }
-      }
-    }else if(input$design_title=='Latin Square Design'){
-      values_variance<-hot_to_r(input$design_variance_table)
-      values_variance<-as.numeric(unlist(values_variance))
-      
-      values_vcomp<-as.numeric(values_variance[c(1,2)])
-      values_sigma2<-as.numeric(values_variance[3])
-      
-      if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-        showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
-                         type = "error", duration = 5)
-        return(NULL)
-      }else{
-        if(levels_num_trt()==1){
-          crd <- designLSD(
-            treatments = levels_vec(),
-            squares = input$num_squares,
-            reuse=input$value_reuse,
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
-        }else if(levels_num_trt()>1&interaction_option_number()=='No'){
-          fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
-          fac_formula <- paste(fac_names, collapse = "+")
-          crd <- designLSD(
-            treatments = levels_vec(),
-            squares = input$num_squares,
-            reuse=input$value_reuse,
-            formula= as.formula(paste0('~',fac_formula,'+(1|row)+(1|col)')),
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
-        }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
-          fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
-          
-          if(is.null(interaction_formula_number())){
+      }else if(input$design_title=='Randomized Complete Block Design'){
+        values_variance<-hot_to_r(input$design_variance_table)
+        values_variance<-as.numeric(unlist(values_variance))
+        values_vcomp<-as.numeric(values_variance[1])
+        values_sigma2<-as.numeric(values_variance[2])
+        
+        if (any(is.na(values_mean)) || any(is.na(values_variance))) {
+          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+                           type = "error", duration = 5)
+          return(NULL)
+        }else{
+          if(levels_num_trt()==1){
+            crd <- designRCBD(
+              treatments = levels_vec(),
+              blocks = input$num_block,
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='No'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             fac_formula <- paste(fac_names, collapse = "+")
-          }else{
-            interaction_terms <- interaction_formula_number()
-            interaction_terms<-unique(interaction_terms)
-            interaction_terms<-interaction_terms[order(interaction_terms)]
             
-            fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
+            crd <- designRCBD(
+              treatments = levels_vec(),
+              blocks = input$num_block,
+              formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
+            
+            if(is.null(interaction_formula_number())){
+              fac_formula <- paste(fac_names, collapse = "+")
+            }else{
+              interaction_terms <- interaction_formula_number()
+              interaction_terms<-unique(interaction_terms)
+              interaction_terms<-interaction_terms[order(interaction_terms)]
+              
+              fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
+            }
+            crd <- designRCBD(
+              treatments = levels_vec(),
+              blocks = input$num_block,
+              formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
           }
-          crd <- designLSD(
-            treatments = levels_vec(),
-            squares = input$num_squares,
-            reuse=input$value_reuse,
-            formula= as.formula(paste0('~',fac_formula,'+(1|row)+(1|col)')),
-            means = values_mean,
-            vcomp = values_vcomp,
-            sigma2 = values_sigma2
-          )
+        }
+      }else if(input$design_title=='Latin Square Design'){
+        values_variance<-hot_to_r(input$design_variance_table)
+        values_variance<-as.numeric(unlist(values_variance))
+        
+        values_vcomp<-as.numeric(values_variance[c(1,2)])
+        values_sigma2<-as.numeric(values_variance[3])
+        
+        if (any(is.na(values_mean)) || any(is.na(values_variance))) {
+          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+                           type = "error", duration = 5)
+          return(NULL)
+        }else{
+          if(levels_num_trt()==1){
+            crd <- designLSD(
+              treatments = levels_vec(),
+              squares = input$num_squares,
+              reuse=input$value_reuse,
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='No'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
+            fac_formula <- paste(fac_names, collapse = "+")
+            crd <- designLSD(
+              treatments = levels_vec(),
+              squares = input$num_squares,
+              reuse=input$value_reuse,
+              formula= as.formula(paste0('~',fac_formula,'+(1|row)+(1|col)')),
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
+          }else if(levels_num_trt()>1&interaction_option_number()=='Yes'){
+            fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
+            
+            if(is.null(interaction_formula_number())){
+              fac_formula <- paste(fac_names, collapse = "+")
+            }else{
+              interaction_terms <- interaction_formula_number()
+              interaction_terms<-unique(interaction_terms)
+              interaction_terms<-interaction_terms[order(interaction_terms)]
+              
+              fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
+            }
+            crd <- designLSD(
+              treatments = levels_vec(),
+              squares = input$num_squares,
+              reuse=input$value_reuse,
+              formula= as.formula(paste0('~',fac_formula,'+(1|row)+(1|col)')),
+              means = values_mean,
+              vcomp = values_vcomp,
+              sigma2 = values_sigma2
+            )
           }
-    }
-    }else if(input$design_title=='Split Plot Design'){
-      values_variance<-hot_to_r(input$design_variance_table)
-      values_variance<-as.numeric(unlist(values_variance))
-      
-      values_vcomp<-as.numeric(values_variance[1])
-      values_sigma2<-as.numeric(values_variance[2])
-      
-      if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-        showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
-                         type = "error", duration = 5)
-        return(NULL)
-      }else{
-        
-        if(levels_num_trt_main()==1){
-          fac_names_main<-'trt.main'
-        }else if(levels_num_trt_main()>1){
-          fac_names_main <- paste0("fac", LETTERS[1:levels_num_trt_main()],'.main')
         }
+      }else if(input$design_title=='Split Plot Design'){
+        values_variance<-hot_to_r(input$design_variance_table)
+        values_variance<-as.numeric(unlist(values_variance))
         
-        if(levels_num_trt_sub()==1){
-          fac_names_sub<-'trt.sub'
-        }else if(levels_num_trt_sub()>1){
-          fac_names_sub <- paste0("fac", LETTERS[1:levels_num_trt_sub()],'.sub')
-        }
+        values_vcomp<-as.numeric(values_variance[1])
+        values_sigma2<-as.numeric(values_variance[2])
         
-        fac_names<-c(fac_names_main,fac_names_sub)
-
-        if(input$interaction_option=='No'){
-          fac_formula <- paste(fac_names, collapse = " + ")
-        }else if(input$interaction_option=='Yes'){
-          if(is.null(input$interaction_formula)){
+        if (any(is.na(values_mean)) || any(is.na(values_variance))) {
+          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+                           type = "error", duration = 5)
+          return(NULL)
+        }else{
+          
+          if(levels_num_trt_main()==1){
+            fac_names_main<-'trt.main'
+          }else if(levels_num_trt_main()>1){
+            fac_names_main <- paste0("fac", LETTERS[1:levels_num_trt_main()],'.main')
+          }
+          
+          if(levels_num_trt_sub()==1){
+            fac_names_sub<-'trt.sub'
+          }else if(levels_num_trt_sub()>1){
+            fac_names_sub <- paste0("fac", LETTERS[1:levels_num_trt_sub()],'.sub')
+          }
+          
+          fac_names<-c(fac_names_main,fac_names_sub)
+          
+          if(input$interaction_option=='No'){
             fac_formula <- paste(fac_names, collapse = " + ")
+          }else if(input$interaction_option=='Yes'){
+            if(is.null(input$interaction_formula)){
+              fac_formula <- paste(fac_names, collapse = " + ")
+            }else{
+              interaction_terms <- input$interaction_formula
+              interaction_terms<-unique(interaction_terms)
+              interaction_terms<-interaction_terms[order(interaction_terms)]
+              
+              fac_formula <- paste(c(fac_names, interaction_terms), collapse = " + ")
+            }
+          }
+          
+          crd<-designSPD(
+            trt.main = levels_vec_main(),
+            trt.sub = levels_vec_sub(),
+            replicates = input$num_rep,
+            formula= as.formula(paste0('~',fac_formula,'+(1|mainplot)')),
+            means = values_mean,
+            vcomp = values_vcomp,
+            sigma2 = values_sigma2
+          )
+        }
+      }else if(input$design_title=='General Design'){
+        req(input$uploaded_file, input$Formula_general)
+        df<-datavalues$uploaded_data
+        
+        cols <- colnames(df)
+        types <- factor_types_number()
+        
+        for (i in seq_along(cols)) {
+          if (types[i] == "Categorical") {
+            df[[cols[i]]] <- as.factor(df[[cols[i]]])
+          } else if (types[i] == "Continuous") {
+            df[[cols[i]]] <- as.numeric(df[[cols[i]]])
+          }
+        }
+        formula_general<-as.formula(input$Formula_general)
+        
+        # Build correlation object safely (no eval/parse)
+        cor_result <- tryCatch(
+          build_correlation(df, input$cor_type),
+          error = function(e) {
+            showNotification(paste("Correlation error:", conditionMessage(e)), type = "error")
+            NULL
+          }
+        )
+        df_use   <- if (!is.null(cor_result)) cor_result$df_model else df
+        cor_obj  <- if (!is.null(cor_result)) cor_result$cor     else NULL
+        
+        variance_list <- values$variance
+        values_variance <- c()
+        
+        for(i in seq_along(variance_list)){
+          table_id <- paste0("design_variance_table_", i)
+          
+          table_data <- hot_to_r(input[[table_id]])
+          
+          n_row <- nrow(table_data)
+          n_col <- ncol(table_data)
+          
+          for(c in 1:n_col){
+            for(r in c:n_row){ 
+              cell_value <- as.numeric(as.character(table_data[r, c]))
+              if(cell_value != "" && cell_value != "--" && !is.na(cell_value)){
+                values_variance <- c(values_variance, as.numeric(cell_value))
+              }
+            }
+          }
+        }
+        
+        values_sigma2<-values_variance[length(values_variance)]
+        
+        mk_args <- list(
+          formula = formula_general,
+          data    = df_use,
+          means   = values_mean,
+          sigma2  = values_sigma2
+        )
+        if (length(values_variance) > 1)
+          mk_args$vcomp <- values_variance[1:(length(values_variance) - 1)]
+        if (!is.null(cor_obj))
+          mk_args$correlation <- cor_obj
+        
+        crd <- do.call(mkdesign, mk_args)
+      }
+      
+      if(input$Type=='F-test'){
+        results <- reactiveValues(
+          omnibus = NULL
+        )
+        convert_type <- function(input) {
+          if(input=='Type I'){
+            return(1)
+          }else if(input=='Type II'){
+            return(2)
+          }else if(input=='Type III'){
+            return(3)
+          }
+        }
+        typess<-convert_type(input$Type_ss)
+        pvalue<-as.numeric(input$p_value1)
+        results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
+        omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
+        colnames(omnibus_result)[1]<-'F-test'
+        results$omnibus<-omnibus_result
+        output$power_omnibus_test <- renderTable({
+          results$omnibus
+        }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+      }else if(input$Type=='t-test'){
+        results <- reactiveValues(
+          contrast = NULL
+        )
+        if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
+          if(input$Contrast!='Contrast vector'){
+            results$contrast<-pwr.contrast(crd, 
+                                           which =  "trt", 
+                                           contrast = input$Contrast,
+                                           sig.level = input$p_value2,
+                                           p.adj = input$p.adj,
+                                           alternative=input$alternative)
+            contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+            colnames(contrast_result)[1]<-' Contrast '
+            results$contrast<-contrast_result
+            output$power_contrast <- renderTable({
+              results$contrast
+            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+          }else if(input$Contrast=='Contrast vector'){
+            req(input$custom_contrast)
+            num_custom_contrast<-input$custom_contrast
+            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
+            numbers_custom_contrast<-trimws(numbers_custom_contrast)
+            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
+            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+            
+            results$contrast<-pwr.contrast(crd, 
+                                           which =  "trt", 
+                                           contrast = list(numbers_custom_contrast),
+                                           sig.level = input$p_value2,
+                                           p.adj = input$p.adj,
+                                           alternative=input$alternative)
+            contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+            colnames(contrast_result)[1]<-' Contrast '
+            contrast_result[1,1]<-'Contrast vector'
+            results$contrast<-contrast_result
+            output$power_contrast <- renderTable({
+              results$contrast
+            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+          }
+        }else if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt>1)||input$design_title%in%c('Split Plot Design','General Design')){
+          which_para<-as.character(input$which_para)
+          by_para<-as.character(input$by_para)
+          if(by_para=='NULL'){
+            
+            if(input$Contrast!='Contrast vector'){
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             contrast = input$Contrast,
+                                             sig.level = input$p_value2,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+              colnames(contrast_result)[1]<-' Contrast '
+              results$contrast<-contrast_result
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }else if(input$Contrast=='Contrast vector'){
+              req(input$custom_contrast)
+              num_custom_contrast<-input$custom_contrast
+              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
+              numbers_custom_contrast<-trimws(numbers_custom_contrast)
+              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
+              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             contrast = list(numbers_custom_contrast),
+                                             sig.level = input$p_value2,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              
+              contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+              colnames(contrast_result)[1]<-' Contrast '
+              contrast_result[1,1]<-'Contrast vector'
+              results$contrast<-contrast_result
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }
+            
           }else{
-            interaction_terms <- input$interaction_formula
-            interaction_terms<-unique(interaction_terms)
-            interaction_terms<-interaction_terms[order(interaction_terms)]
-            
-            fac_formula <- paste(c(fac_names, interaction_terms), collapse = " + ")
-          }
-        }
-        
-        crd<-designSPD(
-          trt.main = levels_vec_main(),
-          trt.sub = levels_vec_sub(),
-          replicates = input$num_rep,
-          formula= as.formula(paste0('~',fac_formula,'+(1|mainplot)')),
-          means = values_mean,
-          vcomp = values_vcomp,
-          sigma2 = values_sigma2
-        )
-      }
-    }else if(input$design_title=='General Design'){
-      req(input$uploaded_file,input$Formula_general,input$Correlation_general)  
-      df<-datavalues$uploaded_data
-
-      cols <- colnames(df)
-      types <- factor_types_number()
-      
-      for (i in seq_along(cols)) {
-        if (types[i] == "Categorical") {
-          df[[cols[i]]] <- as.factor(df[[cols[i]]])
-        } else if (types[i] == "Continuous") {
-          df[[cols[i]]] <- as.numeric(df[[cols[i]]])
-        }
-      }
-      formula_general<-as.formula(input$Formula_general)
-      correlation_general<-input$Correlation_general
-      
-      variance_list <- values$variance
-      values_variance <- c()
-      
-      for(i in seq_along(variance_list)){
-        table_id <- paste0("design_variance_table_", i)
-        
-        table_data <- hot_to_r(input[[table_id]])
-        
-        n_row <- nrow(table_data)
-        n_col <- ncol(table_data)
-        
-        for(c in 1:n_col){
-          for(r in c:n_row){ 
-            cell_value <- as.numeric(as.character(table_data[r, c]))
-            if(cell_value != "" && cell_value != "--" && !is.na(cell_value)){
-              values_variance <- c(values_variance, as.numeric(cell_value))
+            if(input$Contrast!='Contrast vector'){
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             by=by_para,
+                                             contrast = input$Contrast,
+                                             sig.level = input$p_value2,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-results$contrast
+              nnn<-length(contrast_result)
+              contrast_result2<-data.frame()
+              for(multi_by in 1:nnn){
+                dff<-as.data.frame(contrast_result[[multi_by]])
+                name_con<-names(contrast_result[multi_by])
+                dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
+                colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
+                contrast_result2<-rbind(contrast_result2,dff)
+              }
+              results$contrast<-contrast_result2
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }else if(input$Contrast=='Contrast vector'){
+              req(input$custom_contrast)
+              num_custom_contrast<-input$custom_contrast
+              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
+              numbers_custom_contrast<-trimws(numbers_custom_contrast)
+              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
+              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             by=by_para,
+                                             contrast = list(numbers_custom_contrast),
+                                             sig.level = input$p_value2,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-results$contrast
+              nnn<-length(contrast_result)
+              contrast_result2<-data.frame()
+              for(multi_by in 1:nnn){
+                dff<-as.data.frame(contrast_result[[multi_by]])
+                name_con<-names(contrast_result[multi_by])
+                dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
+                colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
+                dff[1,2]<-'Contrast vector'
+                contrast_result2<-rbind(contrast_result2,dff)
+              }
+              results$contrast<-contrast_result2
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }
           }
         }
-      }
-      
-      values_sigma2<-values_variance[length(values_variance)]
-      
-      if(length(values_variance)>1){
-        values_vcomp<-values_variance[1:(length(values_variance)-1)]
-        crd<-mkdesign(
-          formula = formula_general,
-          data = df,
-          means = values_mean,
-          vcomp = values_vcomp,
-          sigma2 = values_sigma2,
-          correlation = eval(parse(text=correlation_general))
+      }else if(input$Type=='F-test & t-test'){
+        results <- reactiveValues(
+          omnibus = NULL,
+          contrast = NULL,
+          all=NULL
         )
-      }else{
-        crd<-mkdesign(
-          formula = formula_general,
-          data = df,
-          means = values_mean,
-          sigma2 = values_sigma2,
-          correlation = eval(parse(text=correlation_general))
-        )
-      }
-    }
-    
-    if(input$Type=='F-test'){
-      results <- reactiveValues(
-        omnibus = NULL
-      )
-      convert_type <- function(input) {
-        if(input=='Type I'){
-          return(1)
-        }else if(input=='Type II'){
-          return(2)
-        }else if(input=='Type III'){
-          return(3)
+        convert_type <- function(input) {
+          if(input=='Type I'){
+            return(1)
+          }else if(input=='Type II'){
+            return(2)
+          }else if(input=='Type III'){
+            return(3)
+          }
         }
-      }
-      typess<-convert_type(input$Type_ss)
-      pvalue<-as.numeric(input$p_value1)
-      results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
-      omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
-      colnames(omnibus_result)[1]<-'F-test'
-      results$omnibus<-omnibus_result
-      output$power_omnibus_test <- renderTable({
-        results$omnibus
-      }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-    }else if(input$Type=='t-test'){
-      results <- reactiveValues(
-        contrast = NULL
-      )
-      if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
-        if(input$Contrast!='Contrast vector'){
-          results$contrast<-pwr.contrast(crd, 
-                                         which =  "trt", 
-                                         contrast = input$Contrast,
-                                         sig.level = input$p_value2,
-                                         p.adj = input$p.adj,
-                                         alternative=input$alternative)
-          contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-          colnames(contrast_result)[1]<-' Contrast '
-          results$contrast<-contrast_result
-          output$power_contrast <- renderTable({
-            results$contrast
-          }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-        }else if(input$Contrast=='Contrast vector'){
-          req(input$custom_contrast)
-          num_custom_contrast<-input$custom_contrast
-          numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-          numbers_custom_contrast<-trimws(numbers_custom_contrast)
-          numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-          numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
-          
-          results$contrast<-pwr.contrast(crd, 
-                                         which =  "trt", 
-                                         contrast = list(numbers_custom_contrast),
-                                         sig.level = input$p_value2,
-                                         p.adj = input$p.adj,
-                                         alternative=input$alternative)
-          contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-          colnames(contrast_result)[1]<-' Contrast '
-          contrast_result[1,1]<-'Contrast vector'
-          results$contrast<-contrast_result
-          output$power_contrast <- renderTable({
-            results$contrast
-          }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-        }
-      }else if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt>1)||input$design_title%in%c('Split Plot Design','General Design')){
-        which_para<-as.character(input$which_para)
-        by_para<-as.character(input$by_para)
-        if(by_para=='NULL'){
-          
+        typess<-convert_type(input$Type_ss)
+        pvalue<-as.numeric(input$p_value1)
+        results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
+        omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
+        colnames(omnibus_result)[1]<-'F-test'
+        results$omnibus<-omnibus_result
+        output$power_omnibus_test <- renderTable({
+          results$omnibus
+        }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+        
+        if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
           if(input$Contrast!='Contrast vector'){
             results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
+                                           which =  "trt", 
                                            contrast = input$Contrast,
-                                           sig.level = input$p_value2,
+                                           sig.level = input$p_value1,
                                            p.adj = input$p.adj,
                                            alternative=input$alternative)
             contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
@@ -3076,12 +3546,11 @@ server<-function(input,output,session) {
             numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
             
             results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
+                                           which =  "trt", 
                                            contrast = list(numbers_custom_contrast),
-                                           sig.level = input$p_value2,
+                                           sig.level = input$p_value1,
                                            p.adj = input$p.adj,
                                            alternative=input$alternative)
-            
             contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
             colnames(contrast_result)[1]<-' Contrast '
             contrast_result[1,1]<-'Contrast vector'
@@ -3090,283 +3559,165 @@ server<-function(input,output,session) {
               results$contrast
             }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
           }
-          
-        }else{
-          if(input$Contrast!='Contrast vector'){
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           by=by_para,
-                                           contrast = input$Contrast,
-                                           sig.level = input$p_value2,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            contrast_result<-results$contrast
-            nnn<-length(contrast_result)
-            contrast_result2<-data.frame()
-            for(multi_by in 1:nnn){
-              dff<-as.data.frame(contrast_result[[multi_by]])
-              name_con<-names(contrast_result[multi_by])
-              dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
-              colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
-              contrast_result2<-rbind(contrast_result2,dff)
-            }
-            results$contrast<-contrast_result2
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-          }else if(input$Contrast=='Contrast vector'){
-            req(input$custom_contrast)
-            num_custom_contrast<-input$custom_contrast
-            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-            numbers_custom_contrast<-trimws(numbers_custom_contrast)
-            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+        }else if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt>1)||input$design_title%in%c('Split Plot Design','General Design')){
+          which_para<-as.character(input$which_para)
+          by_para<-as.character(input$by_para)
+          if(by_para=='NULL'){
             
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           by=by_para,
-                                           contrast = list(numbers_custom_contrast),
-                                           sig.level = input$p_value2,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            contrast_result<-results$contrast
-            nnn<-length(contrast_result)
-            contrast_result2<-data.frame()
-            for(multi_by in 1:nnn){
-              dff<-as.data.frame(contrast_result[[multi_by]])
-              name_con<-names(contrast_result[multi_by])
-              dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
-              colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
-              dff[1,2]<-'Contrast vector'
-              contrast_result2<-rbind(contrast_result2,dff)
+            if(input$Contrast!='Contrast vector'){
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             contrast = input$Contrast,
+                                             sig.level = input$p_value1,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+              colnames(contrast_result)[1]<-' Contrast '
+              results$contrast<-contrast_result
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }else if(input$Contrast=='Contrast vector'){
+              req(input$custom_contrast)
+              num_custom_contrast<-input$custom_contrast
+              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
+              numbers_custom_contrast<-trimws(numbers_custom_contrast)
+              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
+              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             contrast = list(numbers_custom_contrast),
+                                             sig.level = input$p_value1,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              
+              contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
+              colnames(contrast_result)[1]<-' Contrast '
+              contrast_result[1,1]<-'Contrast vector'
+              results$contrast<-contrast_result
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }
-            results$contrast<-contrast_result2
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            
+          }else{
+            if(input$Contrast!='Contrast vector'){
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             by=by_para,
+                                             contrast = input$Contrast,
+                                             sig.level = input$p_value1,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-results$contrast
+              nnn<-length(contrast_result)
+              contrast_result2<-data.frame()
+              for(multi_by in 1:nnn){
+                dff<-as.data.frame(contrast_result[[multi_by]])
+                name_con<-names(contrast_result[multi_by])
+                dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
+                colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
+                contrast_result2<-rbind(contrast_result2,dff)
+              }
+              results$contrast<-contrast_result2
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }else if(input$Contrast=='Contrast vector'){
+              req(input$custom_contrast)
+              num_custom_contrast<-input$custom_contrast
+              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
+              numbers_custom_contrast<-trimws(numbers_custom_contrast)
+              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
+              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              
+              results$contrast<-pwr.contrast(crd, 
+                                             which=which_para,
+                                             by=by_para,
+                                             contrast = list(numbers_custom_contrast),
+                                             sig.level = input$p_value1,
+                                             p.adj = input$p.adj,
+                                             alternative=input$alternative)
+              contrast_result<-results$contrast
+              nnn<-length(contrast_result)
+              contrast_result2<-data.frame()
+              for(multi_by in 1:nnn){
+                dff<-as.data.frame(contrast_result[[multi_by]])
+                name_con<-names(contrast_result[multi_by])
+                dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
+                colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
+                dff[1,2]<-'Contrast vector'
+                contrast_result2<-rbind(contrast_result2,dff)
+              }
+              results$contrast<-contrast_result2
+              output$power_contrast <- renderTable({
+                results$contrast
+              }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+            }
           }
         }
-      }
-    }else if(input$Type=='F-test & t-test'){
-      results <- reactiveValues(
-        omnibus = NULL,
-        contrast = NULL,
-        all=NULL
-      )
-      convert_type <- function(input) {
-        if(input=='Type I'){
-          return(1)
-        }else if(input=='Type II'){
-          return(2)
-        }else if(input=='Type III'){
-          return(3)
+        
+        result1<-results$omnibus
+        result2<-results$contrast
+        result1<-rbind(colnames(result1),result1)
+        result2<-rbind(colnames(result2),result2)
+        nn<-max(length(result1),length(result2))
+        if(ncol(result1)<nn){
+          result1[,(ncol(result1)+1):nn]<-''
         }
-      }
-      typess<-convert_type(input$Type_ss)
-      pvalue<-as.numeric(input$p_value1)
-      results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
-      omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
-      colnames(omnibus_result)[1]<-'F-test'
-      results$omnibus<-omnibus_result
-      output$power_omnibus_test <- renderTable({
-        results$omnibus
-      }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-      
-      if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
-        if(input$Contrast!='Contrast vector'){
-          results$contrast<-pwr.contrast(crd, 
-                                         which =  "trt", 
-                                         contrast = input$Contrast,
-                                         sig.level = input$p_value1,
-                                         p.adj = input$p.adj,
-                                         alternative=input$alternative)
-          contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-          colnames(contrast_result)[1]<-' Contrast '
-          results$contrast<-contrast_result
-          output$power_contrast <- renderTable({
-            results$contrast
-          }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-        }else if(input$Contrast=='Contrast vector'){
-          req(input$custom_contrast)
-          num_custom_contrast<-input$custom_contrast
-          numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-          numbers_custom_contrast<-trimws(numbers_custom_contrast)
-          numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-          numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
-          
-          results$contrast<-pwr.contrast(crd, 
-                                         which =  "trt", 
-                                         contrast = list(numbers_custom_contrast),
-                                         sig.level = input$p_value1,
-                                         p.adj = input$p.adj,
-                                         alternative=input$alternative)
-          contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-          colnames(contrast_result)[1]<-' Contrast '
-          contrast_result[1,1]<-'Contrast vector'
-          results$contrast<-contrast_result
-          output$power_contrast <- renderTable({
-            results$contrast
-          }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
+        if(ncol(result2)<nn){
+          result2[,(ncol(result2)+1):nn]<-''
         }
-      }else if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt>1)||input$design_title%in%c('Split Plot Design','General Design')){
-        which_para<-as.character(input$which_para)
-        by_para<-as.character(input$by_para)
-        if(by_para=='NULL'){
-          
-          if(input$Contrast!='Contrast vector'){
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           contrast = input$Contrast,
-                                           sig.level = input$p_value1,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-            colnames(contrast_result)[1]<-' Contrast '
-            results$contrast<-contrast_result
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-          }else if(input$Contrast=='Contrast vector'){
-            req(input$custom_contrast)
-            num_custom_contrast<-input$custom_contrast
-            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-            numbers_custom_contrast<-trimws(numbers_custom_contrast)
-            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
-            
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           contrast = list(numbers_custom_contrast),
-                                           sig.level = input$p_value1,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            
-            contrast_result<-as.data.frame(cbind(row.names(results$contrast),results$contrast))
-            colnames(contrast_result)[1]<-' Contrast '
-            contrast_result[1,1]<-'Contrast vector'
-            results$contrast<-contrast_result
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-          }
-          
-        }else{
-          if(input$Contrast!='Contrast vector'){
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           by=by_para,
-                                           contrast = input$Contrast,
-                                           sig.level = input$p_value1,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            contrast_result<-results$contrast
-            nnn<-length(contrast_result)
-            contrast_result2<-data.frame()
-            for(multi_by in 1:nnn){
-              dff<-as.data.frame(contrast_result[[multi_by]])
-              name_con<-names(contrast_result[multi_by])
-              dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
-              colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
-              contrast_result2<-rbind(contrast_result2,dff)
-            }
-            results$contrast<-contrast_result2
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-          }else if(input$Contrast=='Contrast vector'){
-            req(input$custom_contrast)
-            num_custom_contrast<-input$custom_contrast
-            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-            numbers_custom_contrast<-trimws(numbers_custom_contrast)
-            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
-            
-            results$contrast<-pwr.contrast(crd, 
-                                           which=which_para,
-                                           by=by_para,
-                                           contrast = list(numbers_custom_contrast),
-                                           sig.level = input$p_value1,
-                                           p.adj = input$p.adj,
-                                           alternative=input$alternative)
-            contrast_result<-results$contrast
-            nnn<-length(contrast_result)
-            contrast_result2<-data.frame()
-            for(multi_by in 1:nnn){
-              dff<-as.data.frame(contrast_result[[multi_by]])
-              name_con<-names(contrast_result[multi_by])
-              dff<-as.data.frame(cbind(name_con,row.names(dff),dff))
-              colnames(dff)[c(1,2)]<-c(' Variable ',' Contrast ')
-              dff[1,2]<-'Contrast vector'
-              contrast_result2<-rbind(contrast_result2,dff)
-            }
-            results$contrast<-contrast_result2
-            output$power_contrast <- renderTable({
-              results$contrast
-            }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
-          }
-        }
+        colnames(result1)<-paste0('V',seq(1:nn))
+        colnames(result2)<-paste0('V',seq(1:nn))
+        results$all<-rbind(c(input$design_title,rep('',nn-1)),c('Results for overall F-test',rep('',nn-1)),result1,'',c('Results for specific contrasts',rep('',nn-1)),result2)
       }
       
-      result1<-results$omnibus
-      result2<-results$contrast
-      result1<-rbind(colnames(result1),result1)
-      result2<-rbind(colnames(result2),result2)
-      nn<-max(length(result1),length(result2))
-      if(ncol(result1)<nn){
-        result1[,(ncol(result1)+1):nn]<-''
+      if(input$Type=='F-test'){
+        output$download_all <- downloadHandler(
+          filename = function() {
+            paste("Power_F_test_", Sys.Date(), ".csv", sep = "")
+          },
+          content = function(file) {
+            req(results$omnibus)
+            result1<-as.data.frame(results$omnibus)
+            result1<-rbind(c(input$design_title,rep('',length(result1)-1)),c('Results for overall F-test',rep('',length(result1)-1)),colnames(result1),result1)
+            fwrite(result1,file,row.names = F,col.names = F)
+          }
+        )
+      }else if(input$Type=='t-test'){
+        output$download_all <- downloadHandler(
+          filename = function() {
+            paste("Power_T_test_", Sys.Date(), ".csv", sep = "")
+          },
+          content = function(file) {
+            req(results$contrast)
+            result1<-as.data.frame(results$contrast)
+            result1<-rbind(c(input$design_title,rep('',length(result1)-1)),c('Results for t-test',rep('',length(result1)-1)),colnames(result1),result1)
+            fwrite(result1,file,row.names = F,col.names = F)
+          }
+        )
+      }else if(input$Type=='F-test & t-test'){
+        output$download_all <- downloadHandler(
+          filename = function() {
+            paste("Power_results_", Sys.Date(), ".csv", sep = "")
+          },
+          content = function(file) {
+            req(results$all)
+            fwrite(results$all,file,row.names = F,col.names = F)
+          }
+        )
       }
-      if(ncol(result2)<nn){
-        result2[,(ncol(result2)+1):nn]<-''
-      }
-      colnames(result1)<-paste0('V',seq(1:nn))
-      colnames(result2)<-paste0('V',seq(1:nn))
-      results$all<-rbind(c(input$design_title,rep('',nn-1)),c('Results for overall F-test',rep('',nn-1)),result1,'',c('Results for specific contrasts',rep('',nn-1)),result2)
-    }
-    
-    if(input$Type=='F-test'){
-      output$download_all <- downloadHandler(
-        filename = function() {
-          paste("Power_F_test_", Sys.Date(), ".csv", sep = "")
-        },
-        content = function(file) {
-          req(results$omnibus)
-          result1<-as.data.frame(results$omnibus)
-          result1<-rbind(c(input$design_title,rep('',length(result1)-1)),c('Results for overall F-test',rep('',length(result1)-1)),colnames(result1),result1)
-          fwrite(result1,file,row.names = F,col.names = F)
-        }
-      )
-    }else if(input$Type=='t-test'){
-      output$download_all <- downloadHandler(
-        filename = function() {
-          paste("Power_T_test_", Sys.Date(), ".csv", sep = "")
-        },
-        content = function(file) {
-          req(results$contrast)
-          result1<-as.data.frame(results$contrast)
-          result1<-rbind(c(input$design_title,rep('',length(result1)-1)),c('Results for t-test',rep('',length(result1)-1)),colnames(result1),result1)
-          fwrite(result1,file,row.names = F,col.names = F)
-        }
-      )
-    }else if(input$Type=='F-test & t-test'){
-      output$download_all <- downloadHandler(
-        filename = function() {
-          paste("Power_results_", Sys.Date(), ".csv", sep = "")
-        },
-        content = function(file) {
-          req(results$all)
-          fwrite(results$all,file,row.names = F,col.names = F)
-        }
+    }, error = function(e) {
+      showNotification(
+        paste("An error occurred:", e$message),
+        type = "error",
+        duration = 8
       )
     }
-  }, error = function(e) {
-    showNotification(
-      paste("An error occurred:", e$message),
-      type = "error",
-      duration = 8
     )
-  }
-  )
-})
+  })
   
   observeEvent({
     list(
@@ -3394,7 +3745,7 @@ server<-function(input,output,session) {
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
-      tryCatch(input$Correlation_general,error=function(e) NULL),
+      tryCatch(input$cor_type,error=function(e) NULL),
       tryCatch(input$design_title,error=function(e) NULL)
     )
   }, {
@@ -3406,9 +3757,8 @@ server<-function(input,output,session) {
       )
     })
   })
-
+  
 }
 
 
 shinyApp(ui = ui, server = server)
-

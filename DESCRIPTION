@@ -11,6 +11,7 @@ Encoding: UTF-8
 Imports:
     shiny,
     pwr4exp,
+    nlme,
     rhandsontable,
     bslib,
     data.table,
