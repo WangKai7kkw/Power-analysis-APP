@@ -34,13 +34,9 @@ shiny::runApp()
 
 ## Citation
 
-If you use this app in your research, please cite the underlying `pwr4exp` package:
+To cite `pwr4exp` in publications use:
 
-```r
-citation("pwr4exp")
-```
-
-Wang K, Niu M (2024). *pwr4exp: Power Analysis for Research Experiments*. R package version 1.0.1. <https://github.com/an-ethz/pwr4exp>
+Wang K, Arshad U, Niu M (2025). Invited review: Enhancing quality of dairy cattle research through adequate power analysis. *Journal of Dairy Science*, **108**(9), 8981–9003. <https://doi.org/10.3168/jds.2024-25793>
 
 ## Overview
 
