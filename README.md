@@ -8,7 +8,7 @@ The app is deployed at: [https://lxxkwa.shinyapps.io/power_analyses_app/](https:
 
 ## Overview
 
-The app supports power analysis for a variety of standard experimental designs and offers flexibility for more complex study designs. It calculates power for both F-tests and t-tests (including pairwise comparisons, polynomial contrasts, and custom contrasts), making it a practical tool for researchers planning experiments.
+The app supports power analysis for a variety of standard experimental designs and offers flexibility for more complex study designs. It calculates power for both F-tests and t-tests (including pairwise comparisons, polynomial contrasts, and custom contrasts).
 
 ## Supported Experimental Designs
 
