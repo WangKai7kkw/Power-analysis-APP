@@ -8,6 +8,8 @@ Authors@R: c(
 Description: An interactive Shiny application built on the pwr4exp package.
 License: GPL (>= 2)
 Encoding: UTF-8
+Depends:
+    R (>= 4.2)
 Imports:
     shiny,
     pwr4exp,
@@ -15,9 +17,10 @@ Imports:
     rhandsontable,
     bslib,
     data.table,
-    shinyBS,
-    bsplus,
-    readxl,
-    rsconnect
+    readxl
+Suggests:
+    rsconnect,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
 URL: https://github.com/WangKai7kkw/Power-analysis-APP
 BugReports: https://github.com/WangKai7kkw/Power-analysis-APP/issues
