@@ -10,13 +10,22 @@ The app is deployed at: [https://wangkai.shinyapps.io/power_analyses_app/](https
 
 ### Prerequisites
 
-- R (>= 4.0 recommended)
-- The following R packages:
+- R (>= 4.2)
+- `renv`
+
+Restore the exact package versions used by the project:
+
+```r
+install.packages("renv")
+renv::restore()
+```
+
+For a manual installation without `renv`, install the following packages:
 
 ```r
 install.packages(c(
   "shiny", "pwr4exp", "bslib", "rhandsontable",
-  "data.table", "shinyBS", "bsplus", "readxl", "rsconnect"
+  "data.table", "readxl", "nlme"
 ))
 ```
 
@@ -104,10 +113,25 @@ Click **Power Calculation** to compute power. Results are displayed in the **Pow
 | [pwr4exp](https://cran.r-project.org/web/packages/pwr4exp/index.html) | Power analysis for experimental designs via linear mixed models |
 | [bslib](https://rstudio.github.io/bslib/) | Bootstrap theming (`cosmo` preset) |
 | [rhandsontable](https://jrowen.github.io/rhandsontable/) | Interactive editable tables for means and variances |
-| [shinyBS](https://github.com/ebailey78/shinyBS) | Bootstrap components (tooltips) |
-| [bsplus](https://github.com/ijlyttle/bsplus) | Additional Bootstrap utilities |
 | [readxl](https://readxl.tidyverse.org/) | Read Excel files in General Design mode |
 | [data.table](https://rdatatable.gitlab.io/data.table/) | Fast data manipulation |
+| [nlme](https://cran.r-project.org/package=nlme) | Residual correlation structures for General Design mode |
+
+## Development and tests
+
+Run the regression suite from the repository root:
+
+```r
+Rscript tests/testthat.R
+Rscript tests/smoke_app.R
+```
+
+Power-calculation expectations are taken from the documented examples in the
+official [pwr4exp vignette](https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html).
+The suite also covers upload handling, validation failures, bounded factor
+generation, combined F/t calculations, and residual-correlation errors. The
+`testthat` command also launches the app in headless Chrome, clicks **Power
+Calculation**, and verifies the rendered omnibus and contrast tables.
 
 ## References
 

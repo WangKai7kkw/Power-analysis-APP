@@ -1,9 +1,20 @@
-#### 
-packages <- c('pwr4exp','rhandsontable','shiny','bslib','data.table','shinyBS','bsplus','readxl','rsconnect','nlme')
-for (p in packages) {
-  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
-  library(p, character.only = TRUE)
+runtime_packages <- c(
+  "pwr4exp", "rhandsontable", "shiny", "bslib", "data.table", "readxl", "nlme"
+)
+missing_packages <- runtime_packages[
+  !vapply(runtime_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages)) {
+  stop(
+    paste0(
+      "Missing required R packages: ", paste(missing_packages, collapse = ", "),
+      ". Restore the project dependencies before starting the app."
+    ),
+    call. = FALSE
+  )
 }
+invisible(lapply(runtime_packages, library, character.only = TRUE))
+source(file.path("R", "app_helpers.R"), local = TRUE)
 
 ui <- page_fillable(
   theme = bs_theme(preset = "cosmo"),
@@ -18,6 +29,17 @@ ui <- page_fillable(
         width: 50% !important;
         max-width: 700px !important;
     }
+    @media (max-width: 1100px) {
+        .app-panels {
+            flex-direction: column;
+            height: auto !important;
+        }
+        .app-panel {
+            flex: 1 1 auto !important;
+            width: 100%;
+            min-height: 520px;
+        }
+    }
   "))
   ),
   uiOutput("main_ui")
@@ -26,6 +48,7 @@ ui <- page_fillable(
 server<-function(input,output,session) {
   
   page_started <- reactiveVal(FALSE)
+  results_generated <- reactiveVal(FALSE)
   
   ui_main<-function(){
     div(
@@ -99,9 +122,11 @@ server<-function(input,output,session) {
       ),
       
       div(
+        class = "app-panels",
         style = "display: flex; gap: 25px; width: 100%;height: 90vh;",
         
         div(
+          class = "app-panel",
           style = "flex: 0 0 28%; min-width: 200px;display: flex; flex-direction: column; height: 100%;",
           card(
             style = "flex: 1; display: flex; flex-direction: column;",
@@ -115,6 +140,7 @@ server<-function(input,output,session) {
         ),
         
         div(
+          class = "app-panel",
           style = "flex: 0 0 28%; min-width: 200px;display: flex; flex-direction: column; height: 100%;",
           card(
             style = "flex: 1; display: flex; flex-direction: column;",
@@ -138,6 +164,7 @@ server<-function(input,output,session) {
         ),
         
         div(
+          class = "app-panel",
           style = "flex: 0 0 44%; min-width: 300px;display: flex; flex-direction: column; height: 100%;",
           card(
             style = "flex: 1; display: flex; flex-direction: column;",
@@ -207,7 +234,7 @@ server<-function(input,output,session) {
             ),
             
             p(
-              "Author: ...",
+              "Authors: Ao Wang and Kai Wang",
               style="margin-top:40px; font-size:24px; font-weight:500;"
             )
           ),
@@ -224,18 +251,7 @@ server<-function(input,output,session) {
   })
   
   generate_factor_combinations <- function(n){
-    letters_vec <- LETTERS[1:n]
-    letters_vec<-paste0('fac',letters_vec)
-    all_combinations <- unlist(
-      lapply(1:n, function(k) {
-        combn(letters_vec, k, simplify = FALSE)
-      }),
-      recursive = FALSE
-    )
-    result <- sapply(all_combinations, function(x) {
-      paste(x, collapse = ":")
-    })
-    return(result)
+    generate_factor_combinations_safe(n)
   }
   
   filter_combinations <- function(all_combinations, exclude_factors) {
@@ -249,6 +265,10 @@ server<-function(input,output,session) {
   }
   
   generate_spd_factors <- function(num_trt_main, num_trt_sub) {
+    validate_factor_count(num_trt_main)
+    validate_factor_count(num_trt_sub)
+    validate_factor_count(num_trt_main + num_trt_sub)
+
     make_factors <- function(prefix, n) {
       if (n == 1) {
         return(paste0("trt.", prefix))
@@ -290,7 +310,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
-                               value = 1, min = 1,width = '100%')
+                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               width = '100%')
               )
           ),
           div(style="margin-bottom: 2px;",
@@ -341,7 +362,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;width:100%;;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
-                               value = 1, min = 1,width = "100%")
+                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               width = "100%")
               )
           ),
           div(style="margin-bottom: 2px;",
@@ -390,7 +412,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
-                               value = 1, min = 1,width = "100%")
+                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               width = "100%")
               )
           ),
           div(style="margin-bottom: 2px;",
@@ -454,7 +477,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt_main", "Number of main plot factors", 
-                               value = 1, min = 1,width="100%")
+                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               width="100%")
               )
           ),
           
@@ -465,7 +489,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt_sub", "Number of sub plot factors",
-                               value = 1, min = 1,width="100%")
+                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               width="100%")
               )
           ),
           div(style="margin-bottom: 2px;",
@@ -604,8 +629,8 @@ server<-function(input,output,session) {
         numericInput(
           inputId = paste0("factor_", i),
           label = factor_name,
-          value = 1,
-          min = 1,
+          value = 2,
+          min = 2,
           step = 1,
           width = "100px"
         )
@@ -617,7 +642,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers",
         label = NULL,
-        value = paste(rep(1, input$num_trt), collapse = ",")
+        value = paste(rep(2, input$num_trt), collapse = ",")
       )
     )
     
@@ -625,7 +650,7 @@ server<-function(input,output,session) {
       lapply(seq_len(input$num_trt), function(i) input[[paste0("factor_", i)]]),
       {
         factor_values <- sapply(seq_len(input$num_trt), function(i) {
-          input[[paste0("factor_", i)]] %||% 1
+          input[[paste0("factor_", i)]] %||% 2
         })
         updateTextInput(
           session,
@@ -659,8 +684,8 @@ server<-function(input,output,session) {
         numericInput(
           inputId = paste0("factor_main_", i),
           label = factor_name_main,
-          value = 1,
-          min = 1,
+          value = 2,
+          min = 2,
           step = 1,
           width = "100px"
         )
@@ -672,7 +697,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_main",
         label = NULL,
-        value = paste(rep(1, input$num_trt_main), collapse = ",")
+        value = paste(rep(2, input$num_trt_main), collapse = ",")
       )
     )
     
@@ -680,7 +705,7 @@ server<-function(input,output,session) {
       lapply(seq_len(input$num_trt_main), function(i) input[[paste0("factor_main_", i)]]),
       {
         factor_values_main <- sapply(seq_len(input$num_trt_main), function(i) {
-          input[[paste0("factor_main_", i)]] %||% 1
+          input[[paste0("factor_main_", i)]] %||% 2
         })
         updateTextInput(
           session,
@@ -714,8 +739,8 @@ server<-function(input,output,session) {
         numericInput(
           inputId = paste0("factor_sub_", i),
           label = factor_name_sub,
-          value = 1,
-          min = 1,
+          value = 2,
+          min = 2,
           step = 1,
           width = "100px"
         )
@@ -727,7 +752,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_sub",
         label = NULL,
-        value = paste(rep(1, input$num_trt_sub), collapse = ",")
+        value = paste(rep(2, input$num_trt_sub), collapse = ",")
       )
     )
     
@@ -735,7 +760,7 @@ server<-function(input,output,session) {
       lapply(seq_len(input$num_trt_sub), function(i) input[[paste0("factor_sub_", i)]]),
       {
         factor_values_sub <- sapply(seq_len(input$num_trt_sub), function(i) {
-          input[[paste0("factor_sub_", i)]] %||% 1
+          input[[paste0("factor_sub_", i)]] %||% 2
         })
         updateTextInput(
           session,
@@ -761,49 +786,23 @@ server<-function(input,output,session) {
     req(page_started())
     req(input$uploaded_file)
     
-    file <- input$uploaded_file$datapath
-    ext <- tools::file_ext(file)
-    
-    supported_ext <- c("csv", "xlsx", "xls", "txt","tsv")
-    
-    if (!(ext %in% supported_ext)) {
+    df <- tryCatch(
+      read_uploaded_data(input$uploaded_file),
+      error = function(e) {
       showNotification(
-        paste("Unsupported file type:", ext, 
-              "Please upload an Excel file (.csv, .xlsx, .xls,.txt, .tsv)."),
-        type = "error",
-        duration = 6
-      )
-      return(NULL)
-    }
-    
-    df<-tryCatch({
-      if (ext == "csv") {
-        read.csv(file, stringsAsFactors = FALSE)
-      } else if (ext %in% c("xlsx", "xls")) {
-        readxl::read_excel(file)
-      }else if (ext %in% c("txt", "tsv")) {
-        read.delim(file, stringsAsFactors = FALSE)
-      }
-    }, error = function(e) {
-      showNotification(
-        paste("Failed to read file:", e$message),
+        conditionMessage(e),
         type = "error",
         duration = 6
       )
       return(NULL)
     })
-    if (is.null(df) || nrow(df) == 0) {
-      showNotification(
-        "The uploaded file is empty or could not be read properly.",
-        type = "warning", duration = 6
-      )
-      return(NULL)
-    }
+    if (is.null(df)) return(NULL)
     datavalues$uploaded_data <- df
   })
   
   observeEvent(input$design_title, {
     req(page_started())
+    req(input$design_title)
     if (input$design_title == "General Design") {
       
       output$file_feedback <- renderUI({
@@ -895,6 +894,7 @@ server<-function(input,output,session) {
   
   observeEvent(input$design_title, {
     req(page_started())
+    req(input$design_title)
     resetInput <- function(id) {
       if (id %in% names(input)) {
         tryCatch({
@@ -957,6 +957,7 @@ server<-function(input,output,session) {
   
   observeEvent(input$design_title, {
     req(page_started())
+    req(input$design_title)
     if (input$design_title == "General Design") {
       values$data <- NULL
       values$variance <- NULL
@@ -965,6 +966,7 @@ server<-function(input,output,session) {
   
   observeEvent(input$design_title, {
     req(page_started())
+    req(input$design_title)
     if (input$design_title != "General Design") {
       datavalues$uploaded_data <- NULL
     }
@@ -997,6 +999,15 @@ server<-function(input,output,session) {
     }else if(input$design_title=='Split Plot Design'){
       req(input$num_trt_main)
       req(input$num_trt_sub)
+      if (input$num_trt_main + input$num_trt_sub > MAX_TREATMENT_FACTORS) {
+        return(div(
+          style = "color:#d9534f; margin-top:6px;",
+          sprintf(
+            "Main-plot and sub-plot factors combined cannot exceed %d.",
+            MAX_TREATMENT_FACTORS
+          )
+        ))
+      }
       
       div(
         style = "flex: 1; padding-top: 2px;width:100%;",
@@ -1052,6 +1063,7 @@ server<-function(input,output,session) {
     }else if(input$design_title=='Split Plot Design'){
       req(input$num_trt_main)
       req(input$num_trt_sub)
+      req(input$num_trt_main + input$num_trt_sub <= MAX_TREATMENT_FACTORS)
       
       if(input$num_trt_main==1){
         fac_names_main<-'trt.main'
@@ -1310,7 +1322,7 @@ server<-function(input,output,session) {
         values$variance<-NULL
       }else{
         if(levels_num_trt()==1&min(levels_vec())>1){
-          crd<-designCRD(
+          crd<-build_crd_design(
             treatments = levels_vec(),
             replicates = input$num_rep,
             template = T
@@ -1319,7 +1331,7 @@ server<-function(input,output,session) {
           fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
           fac_formula <- paste(fac_names, collapse = "+")
           
-          crd<-designCRD(
+          crd<-build_crd_design(
             treatments = levels_vec(),
             replicates = input$num_rep,
             formula= as.formula(paste0('~',fac_formula)),
@@ -1339,7 +1351,7 @@ server<-function(input,output,session) {
             fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
           }
           
-          crd<-designCRD(
+          crd<-build_crd_design(
             treatments = levels_vec(),
             replicates = input$num_rep,
             formula= as.formula(paste0('~',fac_formula)),
@@ -1361,7 +1373,7 @@ server<-function(input,output,session) {
         values$variance<-NULL
       }else{
         if(levels_num_trt()==1&min(levels_vec())>1){
-          crd<-designRCBD(
+          crd<-build_rcbd_design(
             treatments = levels_vec(),
             blocks = input$num_block,
             template = T
@@ -1370,7 +1382,7 @@ server<-function(input,output,session) {
           fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
           fac_formula <- paste(fac_names, collapse = "+")
           
-          crd<-designRCBD(
+          crd<-build_rcbd_design(
             treatments = levels_vec(),
             blocks = input$num_block,
             formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
@@ -1390,7 +1402,7 @@ server<-function(input,output,session) {
             fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
           }
           
-          crd<-designRCBD(
+          crd<-build_rcbd_design(
             treatments = levels_vec(),
             blocks = input$num_block,
             formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
@@ -1412,7 +1424,7 @@ server<-function(input,output,session) {
         values$variance<-NULL
       }else{
         if(levels_num_trt()==1&min(levels_vec())>1){
-          crd<-designLSD(
+          crd<-build_latin_square_design(
             treatments = levels_vec(),
             squares = input$num_squares,
             reuse=input$value_reuse,
@@ -1422,7 +1434,7 @@ server<-function(input,output,session) {
           fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
           fac_formula <- paste(fac_names, collapse = "+")
           
-          crd<-designLSD(
+          crd<-build_latin_square_design(
             treatments = levels_vec(),
             squares = input$num_squares,
             reuse=input$value_reuse,
@@ -1443,7 +1455,7 @@ server<-function(input,output,session) {
             fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
           }
           
-          crd<-designLSD(
+          crd<-build_latin_square_design(
             treatments = levels_vec(),
             squares = input$num_squares,
             reuse=input$value_reuse,
@@ -1483,7 +1495,7 @@ server<-function(input,output,session) {
         if(interaction_option_number()=='No'){
           fac_formula <- paste(fac_names, collapse = "+")
           
-          crd<-designSPD(
+          crd<-build_split_plot_design(
             trt.main = levels_vec_main(),
             trt.sub = levels_vec_sub(),
             replicates = input$num_rep,
@@ -1502,7 +1514,7 @@ server<-function(input,output,session) {
             fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
           }
           
-          crd<-designSPD(
+          crd<-build_split_plot_design(
             trt.main = levels_vec_main(),
             trt.sub = levels_vec_sub(),
             replicates = input$num_rep,
@@ -1536,7 +1548,7 @@ server<-function(input,output,session) {
           }
         }
         
-        crd<-mkdesign(
+        crd<-build_general_design(
           formula = as.formula(input$Formula_general),
           data=df,
           template = T
@@ -1886,14 +1898,6 @@ server<-function(input,output,session) {
   
   # ── Correlation UI helpers ──────────────────────────────────────────────────
   
-  # Safe formula builder (no eval/parse)
-  make_cor_form <- function(rhs, group) {
-    if (!is.null(group) && nzchar(group))
-      stats::as.formula(paste0("~ ", rhs, " | ", group))
-    else
-      stats::as.formula(paste0("~ ", rhs))
-  }
-  
   # Dynamic parameter inputs that depend on the selected correlation type
   output$cor_params_ui <- renderUI({
     req(page_started())
@@ -2100,119 +2104,50 @@ server<-function(input,output,session) {
   # ── Build correlation object from safe whitelist ────────────────────────────
   build_correlation <- function(df, type) {
     if (is.null(type) || type == "none") return(NULL)
-    
-    grp <- tryCatch(input$cor_group, error = function(e) "")
-    if (is.null(grp)) grp <- ""
-    
-    # ── Time-series / non-spatial types ──────────────────────────────────────
-    if (type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
-      cov <- input$cor_time
-      df_model <- df
-      # Support factor time variable for AR1/ARMA by mapping to integer index
-      if (type %in% c("corAR1", "corARMA")) {
-        x <- df_model[[cov]]
-        if (!is.numeric(x)) {
-          df_model[[".cor_time_index"]] <- as.integer(factor(x))
-          time_rhs <- ".cor_time_index"
-        } else {
-          time_rhs <- cov
-        }
-      } else {
-        time_rhs <- cov
-      }
-      
-      form <- make_cor_form(time_rhs, grp)
-      
-      if (type == "corAR1") {
-        return(list(df_model = df_model,
-                    cor = nlme::corAR1(value = input$cor_rho, form = form)))
-      }
-      if (type == "corCAR1") {
-        return(list(df_model = df_model,
-                    cor = nlme::corCAR1(value = input$cor_rho, form = form)))
-      }
-      if (type == "corCompSymm") {
-        return(list(df_model = df_model,
-                    cor = nlme::corCompSymm(value = input$cor_rho, form = form)))
-      }
-      if (type == "corARMA") {
-        p <- as.integer(input$cor_p)
-        q <- as.integer(input$cor_q)
-        k <- p + q
-        vals <- if (k == 0) numeric(0) else {
-          sapply(seq_len(k), function(i) {
-            v <- input[[paste0("cor_arma_", i)]]
-            if (is.null(v)) 0 else as.numeric(v)
-          })
-        }
-        return(list(df_model = df_model,
-                    cor = nlme::corARMA(value = vals, p = p, q = q, form = form)))
-      }
-      if (type == "corSymm") {
-        # Read lower-triangle from rhandsontable
-        tbl <- tryCatch(rhandsontable::hot_to_r(input$cor_symm_table),
-                        error = function(e) NULL)
-        if (is.null(tbl))
-          stop("corSymm table not yet filled.")
-        
-        lev <- unique(df_model[[cov]])
-        lev <- as.character(lev[!is.na(lev)])
-        m   <- length(lev)
-        
-        mat <- matrix(0, nrow = m, ncol = m)
-        diag(mat) <- 1
-        for (r in seq_len(m)) {
-          for (c in seq_len(m)) {
-            if (r > c) {
-              val <- suppressWarnings(as.numeric(as.character(tbl[r, c])))
-              if (is.na(val) || abs(val) >= 1)
-                stop(paste0("Invalid correlation at (", lev[r], ", ", lev[c], "): must be strictly between -1 and 1."))
-              mat[r, c] <- val
-              mat[c, r] <- val
-            }
+
+    params <- list(
+      group = input$cor_group,
+      time = input$cor_time,
+      rho = input$cor_rho,
+      p = input$cor_p,
+      q = input$cor_q,
+      range = input$cor_range,
+      nugget = input$cor_nugget
+    )
+
+    if (type == "corARMA") {
+      parameter_count <- as.integer(input$cor_p) + as.integer(input$cor_q)
+      params$values <- vapply(seq_len(parameter_count), function(i) {
+        as.numeric(input[[paste0("cor_arma_", i)]])
+      }, numeric(1))
+    }
+
+    if (type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
+      dimension <- as.integer(input$cor_dim)
+      params$coordinates <- c(
+        input$cor_x,
+        if (dimension >= 2L) input$cor_y,
+        if (dimension >= 3L) input$cor_z
+      )
+    }
+
+    symm <- NULL
+    if (type == "corSymm") {
+      table <- rhandsontable::hot_to_r(input$cor_symm_table)
+      level_count <- nrow(table)
+      symm <- diag(level_count)
+      for (row in seq_len(level_count)) {
+        for (column in seq_len(level_count)) {
+          if (row > column) {
+            value <- suppressWarnings(as.numeric(as.character(table[row, column])))
+            symm[row, column] <- value
+            symm[column, row] <- value
           }
         }
-        # Positive-definiteness check
-        eigs <- eigen(mat, symmetric = TRUE, only.values = TRUE)$values
-        if (any(eigs <= 0))
-          stop("The specified correlation matrix is not positive definite.")
-        
-        # nlme::corSymm expects a vector of the lower triangle (col-major, below diagonal)
-        value_vec <- mat[lower.tri(mat)]
-        
-        return(list(df_model = df_model,
-                    cor = nlme::corSymm(value = value_vec, form = form)))
       }
     }
-    
-    # ── Spatial types ─────────────────────────────────────────────────────────
-    if (type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
-      rng <- as.numeric(input$cor_range)
-      nug <- isTRUE(input$cor_nugget)
-      dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
-      if (is.null(dim_val)) dim_val <- "1"
-      
-      rhs <- if (dim_val == "3") {
-        paste0(input$cor_x, " + ", input$cor_y, " + ", input$cor_z)
-      } else if (dim_val == "2") {
-        paste0(input$cor_x, " + ", input$cor_y)
-      } else {
-        input$cor_x
-      }
-      
-      form <- make_cor_form(rhs, grp)
-      
-      cor_fun <- switch(type,
-                        corExp   = nlme::corExp,
-                        corGaus  = nlme::corGaus,
-                        corLin   = nlme::corLin,
-                        corRatio = nlme::corRatio,
-                        corSpher = nlme::corSpher
-      )
-      return(list(df_model = df, cor = cor_fun(value = rng, form = form, nugget = nug)))
-    }
-    
-    stop(paste0("Unsupported correlation type: ", type))
+
+    build_correlation_spec(df, type, params, symm)
   }
   
   output$test_options_ui<-renderUI({
@@ -2229,7 +2164,7 @@ server<-function(input,output,session) {
               choices = c('Type I','Type II','Type III'),
               selected = "Type III",
               width = '100%'),
-            sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%"),
+            sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
             actionButton('create_result','Power Calculation',
                          class = "btn-primary",
                          style = "width: 100%;",width = "100%")
@@ -2324,7 +2259,7 @@ server<-function(input,output,session) {
                 choices = c('one.sided','two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%"),
+              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
               checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
               actionButton('create_result','Power Calculation',
                            class = "btn-primary",
@@ -2423,7 +2358,7 @@ server<-function(input,output,session) {
                 choices = c('one.sided','two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%"),
+              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
               checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F),
               actionButton('create_result','Power Calculation',
                            class = "btn-primary",
@@ -2482,7 +2417,7 @@ server<-function(input,output,session) {
                 label = "Alternative",
                 choices = c('one.sided','two.sided'),
                 selected = "two.sided",width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%"),
+              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
               checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
               actionButton('create_result','Power Calculation',
                            class = "btn-primary",
@@ -2518,7 +2453,7 @@ server<-function(input,output,session) {
                 choices = c('Type I','Type II','Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           if(input$num_trt>1){
@@ -2626,7 +2561,7 @@ server<-function(input,output,session) {
                 choices = c('Type I','Type II','Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           
@@ -2722,7 +2657,7 @@ server<-function(input,output,session) {
                 choices = c('Type I','Type II','Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           
@@ -2988,6 +2923,8 @@ server<-function(input,output,session) {
   
   observeEvent(input$which_para, {
     req(page_started())
+    req(!input$design_title %in% c("Split Plot Design", "General Design"))
+    req(input$num_trt)
     updateSelectInput(session=getDefaultReactiveDomain(), "by_para",
                       choices = filter_combinations(generate_factor_combinations(input$num_trt), input$which_para),
                       selected = if (input$by_para %in% filter_combinations(generate_factor_combinations(input$num_trt), input$which_para)) {
@@ -2996,30 +2933,22 @@ server<-function(input,output,session) {
                         "NULL"
                       }
     )
-  })
+  }, ignoreInit = TRUE)
   
   output$level_numbers_validation3 <- renderUI({
     req(page_started())
     req(datavalues$uploaded_data)
     req(input$Formula_general)
     
-    df <- datavalues$uploaded_data
-    formula_text <- input$Formula_general
-    
-    if (!grepl("^~", formula_text)) {
-      return(div(style = "color: #d9534f; margin-top: 4px;",
-                 "Error: Formula must start with '~'. Example: ~fA or ~fA:fB"))
-    }
-    
-    vars <- unlist(regmatches(formula_text, gregexpr("[A-Za-z0-9_]+", formula_text)))
-    vars <- vars[!vars %in% c("", "1")]
-    
-    missing_vars <- setdiff(vars, colnames(df))
-    
-    if (length(missing_vars) > 0) {
-      return(div(style = "color: #d9534f; margin-top: 4px;",
-                 paste0("Warning: The following variable(s) not found in uploaded data → ",
-                        paste(missing_vars, collapse = ", "))))
+    validation_error <- tryCatch({
+      validate_model_formula(input$Formula_general, datavalues$uploaded_data)
+      NULL
+    }, error = function(error) conditionMessage(error))
+    if (!is.null(validation_error)) {
+      return(div(
+        style = "color: #d9534f; margin-top: 4px;",
+        validation_error
+      ))
     }
     
     return(div(style = "color: #28a745; margin-top: 4px;",
@@ -3028,6 +2957,7 @@ server<-function(input,output,session) {
   
   observeEvent(input$create_result,{
     req(page_started())
+    results_generated(FALSE)
     tryCatch({
       output$results_display <- renderUI({
         req(input$Type)
@@ -3077,7 +3007,7 @@ server<-function(input,output,session) {
         }else{
           
           if(levels_num_trt()==1){
-            crd <- designCRD(
+            crd <- build_crd_design(
               treatments = levels_vec(),
               replicates = input$num_rep,
               means = values_mean,
@@ -3086,7 +3016,7 @@ server<-function(input,output,session) {
           }else if(levels_num_trt()>1&interaction_option_number()=='No'){
             fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             fac_formula <- paste(fac_names, collapse = "+")
-            crd <- designCRD(
+            crd <- build_crd_design(
               treatments = levels_vec(),
               replicates = input$num_rep,
               formula=as.formula(paste0('~',fac_formula)),
@@ -3105,7 +3035,7 @@ server<-function(input,output,session) {
               
               fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
             }
-            crd <- designCRD(
+            crd <- build_crd_design(
               treatments = levels_vec(),
               replicates = input$num_rep,
               formula=as.formula(paste0('~',fac_formula)),
@@ -3126,7 +3056,7 @@ server<-function(input,output,session) {
           return(NULL)
         }else{
           if(levels_num_trt()==1){
-            crd <- designRCBD(
+            crd <- build_rcbd_design(
               treatments = levels_vec(),
               blocks = input$num_block,
               means = values_mean,
@@ -3137,7 +3067,7 @@ server<-function(input,output,session) {
             fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             fac_formula <- paste(fac_names, collapse = "+")
             
-            crd <- designRCBD(
+            crd <- build_rcbd_design(
               treatments = levels_vec(),
               blocks = input$num_block,
               formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
@@ -3157,7 +3087,7 @@ server<-function(input,output,session) {
               
               fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
             }
-            crd <- designRCBD(
+            crd <- build_rcbd_design(
               treatments = levels_vec(),
               blocks = input$num_block,
               formula= as.formula(paste0('~',fac_formula,'+(1|block)')),
@@ -3180,7 +3110,7 @@ server<-function(input,output,session) {
           return(NULL)
         }else{
           if(levels_num_trt()==1){
-            crd <- designLSD(
+            crd <- build_latin_square_design(
               treatments = levels_vec(),
               squares = input$num_squares,
               reuse=input$value_reuse,
@@ -3191,7 +3121,7 @@ server<-function(input,output,session) {
           }else if(levels_num_trt()>1&interaction_option_number()=='No'){
             fac_names <- paste0("fac", LETTERS[1:levels_num_trt()])
             fac_formula <- paste(fac_names, collapse = "+")
-            crd <- designLSD(
+            crd <- build_latin_square_design(
               treatments = levels_vec(),
               squares = input$num_squares,
               reuse=input$value_reuse,
@@ -3212,7 +3142,7 @@ server<-function(input,output,session) {
               
               fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
             }
-            crd <- designLSD(
+            crd <- build_latin_square_design(
               treatments = levels_vec(),
               squares = input$num_squares,
               reuse=input$value_reuse,
@@ -3264,7 +3194,7 @@ server<-function(input,output,session) {
             }
           }
           
-          crd<-designSPD(
+          crd<-build_split_plot_design(
             trt.main = levels_vec_main(),
             trt.sub = levels_vec_sub(),
             replicates = input$num_rep,
@@ -3288,16 +3218,10 @@ server<-function(input,output,session) {
             df[[cols[i]]] <- as.numeric(df[[cols[i]]])
           }
         }
-        formula_general<-as.formula(input$Formula_general)
+        formula_general <- validate_model_formula(input$Formula_general, df)
         
         # Build correlation object safely (no eval/parse)
-        cor_result <- tryCatch(
-          build_correlation(df, input$cor_type),
-          error = function(e) {
-            showNotification(paste("Correlation error:", conditionMessage(e)), type = "error")
-            NULL
-          }
-        )
+        cor_result <- build_correlation(df, input$cor_type)
         df_use   <- if (!is.null(cor_result)) cor_result$df_model else df
         cor_obj  <- if (!is.null(cor_result)) cor_result$cor     else NULL
         
@@ -3335,7 +3259,7 @@ server<-function(input,output,session) {
         if (!is.null(cor_obj))
           mk_args$correlation <- cor_obj
         
-        crd <- do.call(mkdesign, mk_args)
+        crd <- do.call(build_general_design, mk_args)
       }
       
       if(input$Type=='F-test'){
@@ -3353,10 +3277,13 @@ server<-function(input,output,session) {
         }
         typess<-convert_type(input$Type_ss)
         pvalue<-as.numeric(input$p_value1)
-        results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
-        omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
-        colnames(omnibus_result)[1]<-'F-test'
-        results$omnibus<-omnibus_result
+        results$omnibus <- as.data.frame(calculate_power_results(
+          crd,
+          test_type = "F-test",
+          type_ss = typess,
+          sig_level_f = pvalue
+        )$omnibus)
+        results$omnibus <- format_omnibus_result(results$omnibus)
         output$power_omnibus_test <- renderTable({
           results$omnibus
         }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
@@ -3366,7 +3293,7 @@ server<-function(input,output,session) {
         )
         if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
           if(input$Contrast!='Contrast vector'){
-            results$contrast<-pwr.contrast(crd, 
+            results$contrast<-calculate_contrast_power(crd,
                                            which =  "trt", 
                                            contrast = input$Contrast,
                                            sig.level = input$p_value2,
@@ -3380,13 +3307,9 @@ server<-function(input,output,session) {
             }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
           }else if(input$Contrast=='Contrast vector'){
             req(input$custom_contrast)
-            num_custom_contrast<-input$custom_contrast
-            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-            numbers_custom_contrast<-trimws(numbers_custom_contrast)
-            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+            numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
             
-            results$contrast<-pwr.contrast(crd, 
+            results$contrast<-calculate_contrast_power(crd,
                                            which =  "trt", 
                                            contrast = list(numbers_custom_contrast),
                                            sig.level = input$p_value2,
@@ -3406,7 +3329,7 @@ server<-function(input,output,session) {
           if(by_para=='NULL'){
             
             if(input$Contrast!='Contrast vector'){
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              contrast = input$Contrast,
                                              sig.level = input$p_value2,
@@ -3420,13 +3343,9 @@ server<-function(input,output,session) {
               }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }else if(input$Contrast=='Contrast vector'){
               req(input$custom_contrast)
-              num_custom_contrast<-input$custom_contrast
-              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-              numbers_custom_contrast<-trimws(numbers_custom_contrast)
-              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
               
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              contrast = list(numbers_custom_contrast),
                                              sig.level = input$p_value2,
@@ -3444,7 +3363,7 @@ server<-function(input,output,session) {
             
           }else{
             if(input$Contrast!='Contrast vector'){
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              by=by_para,
                                              contrast = input$Contrast,
@@ -3467,13 +3386,9 @@ server<-function(input,output,session) {
               }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }else if(input$Contrast=='Contrast vector'){
               req(input$custom_contrast)
-              num_custom_contrast<-input$custom_contrast
-              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-              numbers_custom_contrast<-trimws(numbers_custom_contrast)
-              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
               
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              by=by_para,
                                              contrast = list(numbers_custom_contrast),
@@ -3515,17 +3430,20 @@ server<-function(input,output,session) {
         }
         typess<-convert_type(input$Type_ss)
         pvalue<-as.numeric(input$p_value1)
-        results$omnibus<-as.data.frame(pwr.anova(crd,sig.level = pvalue,type = typess))
-        omnibus_result<-as.data.frame(cbind(row.names(results$omnibus),results$omnibus))
-        colnames(omnibus_result)[1]<-'F-test'
-        results$omnibus<-omnibus_result
+        results$omnibus <- as.data.frame(calculate_power_results(
+          crd,
+          test_type = "F-test",
+          type_ss = typess,
+          sig_level_f = pvalue
+        )$omnibus)
+        results$omnibus <- format_omnibus_result(results$omnibus)
         output$power_omnibus_test <- renderTable({
           results$omnibus
         }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
         
         if((!input$design_title%in%c('Split Plot Design','General Design')&&input$num_trt==1)){
           if(input$Contrast!='Contrast vector'){
-            results$contrast<-pwr.contrast(crd, 
+            results$contrast<-calculate_contrast_power(crd,
                                            which =  "trt", 
                                            contrast = input$Contrast,
                                            sig.level = input$p_value1,
@@ -3539,13 +3457,9 @@ server<-function(input,output,session) {
             }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
           }else if(input$Contrast=='Contrast vector'){
             req(input$custom_contrast)
-            num_custom_contrast<-input$custom_contrast
-            numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-            numbers_custom_contrast<-trimws(numbers_custom_contrast)
-            numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-            numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+            numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
             
-            results$contrast<-pwr.contrast(crd, 
+            results$contrast<-calculate_contrast_power(crd,
                                            which =  "trt", 
                                            contrast = list(numbers_custom_contrast),
                                            sig.level = input$p_value1,
@@ -3565,7 +3479,7 @@ server<-function(input,output,session) {
           if(by_para=='NULL'){
             
             if(input$Contrast!='Contrast vector'){
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              contrast = input$Contrast,
                                              sig.level = input$p_value1,
@@ -3579,13 +3493,9 @@ server<-function(input,output,session) {
               }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }else if(input$Contrast=='Contrast vector'){
               req(input$custom_contrast)
-              num_custom_contrast<-input$custom_contrast
-              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-              numbers_custom_contrast<-trimws(numbers_custom_contrast)
-              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
               
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              contrast = list(numbers_custom_contrast),
                                              sig.level = input$p_value1,
@@ -3603,7 +3513,7 @@ server<-function(input,output,session) {
             
           }else{
             if(input$Contrast!='Contrast vector'){
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              by=by_para,
                                              contrast = input$Contrast,
@@ -3626,13 +3536,9 @@ server<-function(input,output,session) {
               }, striped = TRUE, hover = TRUE, width = "100%", align = 'c')
             }else if(input$Contrast=='Contrast vector'){
               req(input$custom_contrast)
-              num_custom_contrast<-input$custom_contrast
-              numbers_custom_contrast<-unlist(strsplit(num_custom_contrast, ","))
-              numbers_custom_contrast<-trimws(numbers_custom_contrast)
-              numbers_custom_contrast<-numbers_custom_contrast[numbers_custom_contrast!=""]
-              numbers_custom_contrast<-as.numeric(numbers_custom_contrast)
+              numbers_custom_contrast <- parse_custom_contrast(input$custom_contrast)
               
-              results$contrast<-pwr.contrast(crd, 
+              results$contrast<-calculate_contrast_power(crd,
                                              which=which_para,
                                              by=by_para,
                                              contrast = list(numbers_custom_contrast),
@@ -3709,6 +3615,7 @@ server<-function(input,output,session) {
           }
         )
       }
+      results_generated(TRUE)
     }, error = function(e) {
       showNotification(
         paste("An error occurred:", e$message),
@@ -3750,10 +3657,16 @@ server<-function(input,output,session) {
     )
   }, {
     req(page_started())
+    stale_results <- results_generated()
+    if (stale_results) results_generated(FALSE)
     output$results_display <- renderUI({
       div(
         style = "text-align:center; padding: 40px; color: #777;",
-        "Please click 'Power Calculation' to generate results."
+        if (stale_results) {
+          "Inputs changed. Click 'Power Calculation' to refresh the results."
+        } else {
+          "Please click 'Power Calculation' to generate results."
+        }
       )
     })
   })

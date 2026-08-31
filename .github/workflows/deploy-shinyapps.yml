@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - "app.R"
+      - "R/**"
       - "DESCRIPTION"
+      - "renv.lock"
+      - "tests/**"
       - "www/**"
       - ".github/workflows/deploy-shinyapps.yml"
   workflow_dispatch:
@@ -33,14 +36,17 @@ jobs:
         with:
           use-public-rspm: true
 
-      - name: Install system dependencies (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+      - name: Restore locked R dependencies
+        uses: r-lib/actions/setup-renv@v2
 
-      - name: Install R packages needed by the app
-        run: |
-          Rscript -e 'install.packages(c("shiny","pwr4exp","dplyr","rhandsontable","bslib","data.table","shinyBS","bsplus","readxl","rsconnect"), repos="https://cloud.r-project.org")'
+      - name: Run regression tests
+        run: Rscript tests/testthat.R
+
+      - name: Run Shiny startup smoke test
+        run: Rscript tests/smoke_app.R
+
+      - name: Parse application source
+        run: Rscript -e 'invisible(parse(file="app.R")); invisible(parse(file="R/app_helpers.R"))'
 
       - name: Deploy to shinyapps.io
         env:

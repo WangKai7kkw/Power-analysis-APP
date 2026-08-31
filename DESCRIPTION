@@ -20,6 +20,7 @@ Imports:
     readxl
 Suggests:
     rsconnect,
+    shinytest2 (>= 0.5.1),
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 URL: https://github.com/WangKai7kkw/Power-analysis-APP
