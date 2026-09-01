@@ -43,7 +43,7 @@ field_note <- function(...) {
   div(class = "field-note", icon("circle-info"), tags$span(...))
 }
 
-friendly_term_choices <- function(values) {
+friendly_term_choices <- function(values, treatment_spec = NULL) {
   labels <- values
   labels <- gsub("trt\\.main", "Whole-plot treatment", labels)
   labels <- gsub("trt\\.sub", "Subplot treatment", labels)
@@ -51,6 +51,18 @@ friendly_term_choices <- function(values) {
   labels <- gsub("fac([A-Z])\\.sub", "Subplot factor \\1", labels)
   labels <- gsub("fac([A-Z])", "Factor \\1", labels)
   labels <- gsub(":", " × ", labels, fixed = TRUE)
+  if (
+    !is.null(treatment_spec) &&
+      is.null(validate_treatment_label_spec(treatment_spec)) &&
+      treatment_labels_customised(treatment_spec)
+  ) {
+    labels <- vapply(
+      values,
+      translate_model_term,
+      character(1),
+      spec = treatment_spec
+    )
+  }
   stats::setNames(values, labels)
 }
 
@@ -324,6 +336,19 @@ app_css <- "
     line-height: 1.45;
   }
   .field-note svg, .field-note i { margin-top: 2px; color: var(--primary); }
+  .naming-grid { display: grid; gap: 10px; margin-top: 4px; }
+  .naming-row {
+    display: grid;
+    grid-template-columns: minmax(130px, .75fr) minmax(190px, 1.25fr);
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+  }
+  .naming-row .form-group { margin-bottom: 0; }
+  .validation-success { margin: 7px 0 0; color: var(--success); font-size: 12px; }
+  .validation-error { margin: 7px 0 0; color: var(--danger); font-size: 12px; }
   .model-preview {
     margin: 2px 0 14px;
     padding: 12px 13px;
@@ -443,6 +468,7 @@ app_css <- "
     .workflow-map-item { padding: 8px 5px; font-size: 11px; }
     .workflow-card > .card-header, .panel-body { padding: 15px; }
     .welcome-modal { padding: 26px 22px 22px; }
+    .naming-row { grid-template-columns: 1fr; }
   }
 "
 
@@ -672,15 +698,25 @@ server<-function(input,output,session) {
     )
   }
   
-  filter_combinations <- function(all_combinations, exclude_factors) {
-    if (length(exclude_factors) == 0) return(friendly_term_choices(all_combinations))
+  filter_combinations <- function(all_combinations, exclude_factors, treatment_spec = NULL) {
+    if (length(exclude_factors) == 0) {
+      values <- c("NULL", all_combinations)
+      labels <- c(
+        "No conditioning variable",
+        unname(names(friendly_term_choices(all_combinations, treatment_spec)))
+      )
+      return(stats::setNames(values, labels))
+    }
     exclude_factors <- unlist(strsplit(exclude_factors, "\\:"))
     filtered <- sapply(all_combinations, function(comb) {
       factors <- unlist(strsplit(comb, "\\:"))
       !any(factors %in% exclude_factors)
     })
     values <- c("NULL", all_combinations[filtered])
-    labels <- c("No conditioning variable", unname(names(friendly_term_choices(all_combinations[filtered]))))
+    labels <- c(
+      "No conditioning variable",
+      unname(names(friendly_term_choices(all_combinations[filtered], treatment_spec)))
+    )
     stats::setNames(values, labels)
   }
   
@@ -736,7 +772,9 @@ server<-function(input,output,session) {
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_number_ui")
-          )
+          ),
+          uiOutput("treatment_names_ui"),
+          uiOutput("treatment_names_validation")
         ),
         
         
@@ -786,7 +824,9 @@ server<-function(input,output,session) {
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_number_ui")
-          )
+          ),
+          uiOutput("treatment_names_ui"),
+          uiOutput("treatment_names_validation")
         ),
         
         bslib::card(
@@ -834,7 +874,9 @@ server<-function(input,output,session) {
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_number_ui")
-          )
+          ),
+          uiOutput("treatment_names_ui"),
+          uiOutput("treatment_names_validation")
         ),
         
         bslib::card(
@@ -910,7 +952,9 @@ server<-function(input,output,session) {
           ),
           div(style="margin-bottom: 2px;",
               uiOutput("level_numbers_sub_ui")
-          )
+          ),
+          uiOutput("treatment_names_ui"),
+          uiOutput("treatment_names_validation")
         ),
         
         bslib::card(
@@ -1040,13 +1084,12 @@ server<-function(input,output,session) {
     factor_count <- count_result$value
 
     num_inputs <- lapply(seq_len(factor_count), function(i) {
-      factor_name <- paste0("Factor ", LETTERS[i])
       tags$div(
         style = "display: flex; flex-direction: column; align-items: center;",
         numericInput(
           inputId = paste0("factor_", i),
-          label = factor_name,
-          value = 2,
+          label = paste0("Factor ", LETTERS[i]),
+          value = isolate(input[[paste0("factor_", i)]]) %||% 2,
           min = 2,
           step = 1,
           width = "100px"
@@ -1059,7 +1102,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers",
         label = NULL,
-        value = paste(rep(2, factor_count), collapse = ",")
+        value = isolate(input$level_numbers) %||% paste(rep(2, factor_count), collapse = ",")
       )
     )
     
@@ -1100,14 +1143,12 @@ server<-function(input,output,session) {
     factor_count <- count_result$value
     
     num_inputs_main <- lapply(seq_len(factor_count), function(i) {
-      factor_name_main <- paste0("Factor ", LETTERS[i])
-      
       tags$div(
         style = "display: flex; flex-direction: column; align-items: center;",
         numericInput(
           inputId = paste0("factor_main_", i),
-          label = factor_name_main,
-          value = 2,
+          label = paste0("Factor ", LETTERS[i]),
+          value = isolate(input[[paste0("factor_main_", i)]]) %||% 2,
           min = 2,
           step = 1,
           width = "100px"
@@ -1120,7 +1161,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_main",
         label = NULL,
-        value = paste(rep(2, factor_count), collapse = ",")
+        value = isolate(input$level_numbers_main) %||% paste(rep(2, factor_count), collapse = ",")
       )
     )
     
@@ -1161,14 +1202,12 @@ server<-function(input,output,session) {
     factor_count <- count_result$value
     
     num_inputs_sub <- lapply(seq_len(factor_count), function(i) {
-      factor_name_sub <- paste0("Factor ", LETTERS[i])
-      
       tags$div(
         style = "display: flex; flex-direction: column; align-items: center;",
         numericInput(
           inputId = paste0("factor_sub_", i),
-          label = factor_name_sub,
-          value = 2,
+          label = paste0("Factor ", LETTERS[i]),
+          value = isolate(input[[paste0("factor_sub_", i)]]) %||% 2,
           min = 2,
           step = 1,
           width = "100px"
@@ -1181,7 +1220,7 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_sub",
         label = NULL,
-        value = paste(rep(2, factor_count), collapse = ",")
+        value = isolate(input$level_numbers_sub) %||% paste(rep(2, factor_count), collapse = ",")
       )
     )
     
@@ -1210,6 +1249,230 @@ server<-function(input,output,session) {
       ),
       hidden_text_input_sub
     )  
+  })
+
+  reconcile_level_label_value <- function(input_id, defaults) {
+    current <- parse_treatment_labels(isolate(input[[input_id]]))
+    if (length(current) == 0L) return(paste(defaults, collapse = ", "))
+    generated_level_pattern <- "^(trt|fac[A-Z])(\\.(main|sub))?[0-9]+$"
+    if (
+      all(grepl(generated_level_pattern, current)) &&
+        !identical(current, defaults)
+    ) {
+      return(paste(defaults, collapse = ", "))
+    }
+    retained <- head(current, length(defaults))
+    if (length(retained) < length(defaults)) {
+      retained <- c(retained, defaults[seq.int(length(retained) + 1L, length(defaults))])
+    }
+    paste(retained, collapse = ", ")
+  }
+
+  naming_row <- function(prefix, index, internal, level_count, scope_label) {
+    name_id <- paste0(prefix, "_name_", index)
+    levels_id <- paste0(prefix, "_levels_", index)
+    defaults <- paste0(internal, seq_len(level_count))
+    current_name <- isolate(input[[name_id]])
+    generated_factor_pattern <- "^(trt|fac[A-Z])(\\.(main|sub))?$"
+    if (
+      is.null(current_name) || !nzchar(trimws(current_name)) ||
+        (
+          grepl(generated_factor_pattern, trimws(current_name)) &&
+            !identical(trimws(current_name), internal)
+        )
+    ) {
+      current_name <- internal
+    }
+
+    div(
+      class = "naming-row",
+      textInput(
+        name_id,
+        paste0(scope_label, " name"),
+        value = current_name,
+        placeholder = paste0("For example: ", scope_label)
+      ),
+      textInput(
+        levels_id,
+        "Level names",
+        value = reconcile_level_label_value(levels_id, defaults),
+        placeholder = "For example: Control, Low dose, High dose"
+      )
+    )
+  }
+
+  treatment_level_counts <- function(value, factor_count) {
+    counts <- suppressWarnings(as.integer(
+      trimws(strsplit(value %||% "", ",", fixed = TRUE)[[1]])
+    ))
+    counts <- counts[!is.na(counts) & counts >= 2L]
+    if (length(counts) < factor_count) {
+      counts <- c(counts, rep(2L, factor_count - length(counts)))
+    }
+    head(counts, factor_count)
+  }
+
+  output$treatment_names_ui <- renderUI({
+    req(page_started(), input$design_title)
+    if (input$design_title == "General Design") return(NULL)
+
+    rows <- if (input$design_title == "Split Plot Design") {
+      req(input$num_trt_main, input$num_trt_sub, input$level_numbers_main, input$level_numbers_sub)
+      main_count <- validate_factor_count(input$num_trt_main)
+      sub_count <- validate_factor_count(input$num_trt_sub)
+      main_levels <- treatment_level_counts(input$level_numbers_main, main_count)
+      sub_levels <- treatment_level_counts(input$level_numbers_sub, sub_count)
+      main_internal <- if (main_count == 1L) "trt.main" else paste0("fac", LETTERS[seq_len(main_count)], ".main")
+      sub_internal <- if (sub_count == 1L) "trt.sub" else paste0("fac", LETTERS[seq_len(sub_count)], ".sub")
+
+      c(
+        lapply(seq_len(main_count), function(index) {
+          naming_row("main_factor", index, main_internal[[index]], main_levels[[index]], paste("Whole-plot factor", index))
+        }),
+        lapply(seq_len(sub_count), function(index) {
+          naming_row("sub_factor", index, sub_internal[[index]], sub_levels[[index]], paste("Subplot factor", index))
+        })
+      )
+    } else {
+      req(input$num_trt, input$level_numbers)
+      factor_count <- validate_factor_count(input$num_trt)
+      level_counts <- treatment_level_counts(input$level_numbers, factor_count)
+      internals <- if (factor_count == 1L) "trt" else paste0("fac", LETTERS[seq_len(factor_count)])
+      lapply(seq_len(factor_count), function(index) {
+        naming_row("treatment_factor", index, internals[[index]], level_counts[[index]], paste("Factor", index))
+      })
+    }
+
+    tagList(
+      tags$hr(style = "margin: 14px 0; border-color: #dce3ee; opacity: 1;"),
+      section_header("tags", "Treatment names", "Replace generated model labels with the names used in your study."),
+      field_note("Enter one comma-separated level name for every level. Names change tables, results, and downloads; the statistical model remains the same."),
+      div(class = "naming-grid", rows)
+    )
+  })
+
+  active_treatment_label_spec <- reactive({
+    req(page_started(), input$design_title)
+    if (input$design_title == "General Design") return(list())
+
+    if (input$design_title == "Split Plot Design") {
+      req(input$num_trt_main, input$num_trt_sub, input$level_numbers_main, input$level_numbers_sub)
+      main_count <- validate_factor_count(input$num_trt_main)
+      sub_count <- validate_factor_count(input$num_trt_sub)
+      main_levels <- treatment_level_counts(input$level_numbers_main, main_count)
+      sub_levels <- treatment_level_counts(input$level_numbers_sub, sub_count)
+      main_internal <- if (main_count == 1L) "trt.main" else paste0("fac", LETTERS[seq_len(main_count)], ".main")
+      sub_internal <- if (sub_count == 1L) "trt.sub" else paste0("fac", LETTERS[seq_len(sub_count)], ".sub")
+
+      return(c(
+        lapply(seq_len(main_count), function(index) {
+          build_treatment_factor_spec(
+            main_internal[[index]],
+            input[[paste0("main_factor_name_", index)]],
+            input[[paste0("main_factor_levels_", index)]],
+            main_levels[[index]]
+          )
+        }),
+        lapply(seq_len(sub_count), function(index) {
+          build_treatment_factor_spec(
+            sub_internal[[index]],
+            input[[paste0("sub_factor_name_", index)]],
+            input[[paste0("sub_factor_levels_", index)]],
+            sub_levels[[index]]
+          )
+        })
+      ))
+    }
+
+    req(input$num_trt, input$level_numbers)
+    factor_count <- validate_factor_count(input$num_trt)
+    level_counts <- treatment_level_counts(input$level_numbers, factor_count)
+    internals <- if (factor_count == 1L) "trt" else paste0("fac", LETTERS[seq_len(factor_count)])
+    lapply(seq_len(factor_count), function(index) {
+      build_treatment_factor_spec(
+        internals[[index]],
+        input[[paste0("treatment_factor_name_", index)]],
+        input[[paste0("treatment_factor_levels_", index)]],
+        level_counts[[index]]
+      )
+    })
+  })
+
+  display_treatment_label_spec <- reactive({
+    spec <- tryCatch(active_treatment_label_spec(), error = function(error) list())
+    if (!is.null(validate_treatment_label_spec(spec))) return(list())
+    spec
+  })
+
+  observe({
+    req(page_started(), input$design_title)
+    if (input$design_title == "General Design") return(NULL)
+
+    spec <- display_treatment_label_spec()
+    display_label <- function(factor, fallback) {
+      if (
+        is.null(factor) || identical(factor$name, factor$internal) ||
+          !nzchar(trimws(factor$name))
+      ) {
+        return(fallback)
+      }
+      factor$name
+    }
+
+    if (input$design_title == "Split Plot Design") {
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      if (is.null(main_result$value) || is.null(sub_result$value)) return(NULL)
+      main_count <- main_result$value
+      sub_count <- sub_result$value
+      for (index in seq_len(main_count)) {
+        updateNumericInput(
+          session,
+          paste0("factor_main_", index),
+          label = display_label(
+            if (index <= length(spec)) spec[[index]] else NULL,
+            paste0("Factor ", LETTERS[index])
+          )
+        )
+      }
+      for (index in seq_len(sub_count)) {
+        spec_index <- main_count + index
+        updateNumericInput(
+          session,
+          paste0("factor_sub_", index),
+          label = display_label(
+            if (spec_index <= length(spec)) spec[[spec_index]] else NULL,
+            paste0("Factor ", LETTERS[index])
+          )
+        )
+      }
+      return(NULL)
+    }
+
+    count_result <- factor_count_result(input$num_trt)
+    if (is.null(count_result$value)) return(NULL)
+    factor_count <- count_result$value
+    for (index in seq_len(factor_count)) {
+      updateNumericInput(
+        session,
+        paste0("factor_", index),
+        label = display_label(
+          if (index <= length(spec)) spec[[index]] else NULL,
+          paste0("Factor ", LETTERS[index])
+        )
+      )
+    }
+  })
+
+  output$treatment_names_validation <- renderUI({
+    req(page_started(), input$design_title != "General Design")
+    spec <- active_treatment_label_spec()
+    message <- validate_treatment_label_spec(spec)
+    if (is.null(message)) {
+      div(class = "validation-success", icon("circle-check"), " Treatment names are ready.")
+    } else {
+      div(class = "validation-error", icon("triangle-exclamation"), " ", message)
+    }
   })
   
   observeEvent(input$uploaded_file, {
@@ -1474,6 +1737,7 @@ server<-function(input,output,session) {
             combn(fac_names, k, FUN = function(x) paste(x, collapse = " : "))
           })
         )
+        selected_interactions <- intersect(input$interaction_formula %||% character(0), all_combinations)
         tagList(
           div(
             style = "flex: 1; padding-top: 2px;width:100%;",
@@ -1482,9 +1746,9 @@ server<-function(input,output,session) {
               selectizeInput(
                 inputId = "interaction_formula",
                 label = "Interactions to include",
-                choices = all_combinations,
+                choices = friendly_term_choices(all_combinations, display_treatment_label_spec()),
                 multiple = TRUE,
-                selected = NULL,
+                selected = selected_interactions,
                 options = list(placeholder = 'Choose one or more factor combinations'),
                 width = "100%"
               )
@@ -1519,6 +1783,7 @@ server<-function(input,output,session) {
           combn(fac_names, k, FUN = function(x) paste(x, collapse = " : "))
         })
       )
+      selected_interactions <- intersect(input$interaction_formula %||% character(0), all_combinations)
       tagList(
         div(
           style = "flex: 1; padding-top: 2px;width:100%;",
@@ -1527,9 +1792,9 @@ server<-function(input,output,session) {
             selectizeInput(
               inputId = "interaction_formula",
               label = "Interactions to include",
-              choices = all_combinations,
+              choices = friendly_term_choices(all_combinations, display_treatment_label_spec()),
               multiple = TRUE,
-              selected = NULL,
+              selected = selected_interactions,
               options = list(placeholder = 'Choose one or more factor combinations'),
               width = "100%"
             )
@@ -1611,29 +1876,37 @@ server<-function(input,output,session) {
         }
       }
       
+      display_formula <- if (is.null(fac_formula)) {
+        fac_formula
+      } else {
+        htmltools::htmlEscape(
+          translate_model_formula_text(fac_formula, display_treatment_label_spec())
+        )
+      }
+
       note_text <- 
         if(input$design_title=='Completely Randomized Design'){
           paste0(
             '<strong>Generated model</strong>',
-            'Fixed effects: ~ ', fac_formula, '<br>',
+            'Fixed effects: ~ ', display_formula, '<br>',
             'Variance component: residual error (&sigma;<sup>2</sup><sub>e</sub>)'
           )
         } else if(input$design_title=='Randomized Complete Block Design'){
           paste0(
             '<strong>Generated model</strong>',
-            'Fixed and random effects: ~ ', fac_formula, '<br>',
+            'Fixed and random effects: ~ ', display_formula, '<br>',
             'Variance components: block and residual error'
           )
         } else if(input$design_title=='Latin Square Design'){
           paste0(
             '<strong>Generated model</strong>',
-            'Fixed and random effects: ~ ', fac_formula, '<br>',
+            'Fixed and random effects: ~ ', display_formula, '<br>',
             'Variance components: row, column, and residual error'
           )
         } else if(input$design_title=='Split Plot Design'){
           paste0(
             '<strong>Generated model</strong>',
-            'Fixed and random effects: ~ ', fac_formula, ' + (1 | mainplot)', '<br>',
+            'Fixed and random effects: ~ ', display_formula, ' + (1 | mainplot)', '<br>',
             'Variance components: whole plot and residual error'
           )
         } 
@@ -2117,10 +2390,25 @@ server<-function(input,output,session) {
       }
     })
     
-    output$design_table <- rhandsontable::renderRHandsontable({
+  output$design_table <- rhandsontable::renderRHandsontable({
       req(values$data)
       
-      df <- as.data.frame(values$data)
+      internal_df <- as.data.frame(values$data)
+      current_df <- tryCatch({
+        current_table <- isolate(input$design_table)
+        if (is.null(current_table)) NULL else as.data.frame(rhandsontable::hot_to_r(current_table))
+      }, error = function(error) NULL)
+      df <- if (
+        !is.null(current_df) &&
+        identical(dim(current_df), dim(internal_df))
+      ) current_df else internal_df
+
+      spec <- tryCatch(active_treatment_label_spec(), error = function(error) list())
+      if (is.null(validate_treatment_label_spec(spec))) {
+        row.names(df) <- translate_design_labels(row.names(internal_df), spec)
+      } else {
+        row.names(df) <- row.names(internal_df)
+      }
       
       col_widths <- pmax(160, nchar(colnames(df))) 
       row_name_width <- max(nchar(rownames(df))) * 10+5
@@ -2639,7 +2927,10 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "Effect to compare",
-                  choices = friendly_term_choices(generate_factor_combinations(num_trt)),
+                  choices = friendly_term_choices(
+                    generate_factor_combinations(num_trt),
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_which,
                   width = "100%")
               )
@@ -2654,7 +2945,11 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='Show comparisons within (optional)',
-                  choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
+                  choices = filter_combinations(
+                    generate_factor_combinations(num_trt),
+                    input$which_para,
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_by,
                   width = "100%")
               )
@@ -2737,7 +3032,10 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "Effect to compare",
-                  choices = friendly_term_choices(generate_spd_factors(num_trt_main,num_trt_sub)),
+                  choices = friendly_term_choices(
+                    generate_spd_factors(num_trt_main,num_trt_sub),
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_which,
                   width = "100%")
               )
@@ -2753,7 +3051,11 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='Show comparisons within (optional)',
-                  choices = filter_combinations(generate_spd_factors(num_trt_main,num_trt_sub),input$which_para),
+                  choices = filter_combinations(
+                    generate_spd_factors(num_trt_main,num_trt_sub),
+                    input$which_para,
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_by,
                   width = "100%")
               )
@@ -2908,7 +3210,10 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "Effect to compare",
-                  choices = friendly_term_choices(generate_factor_combinations(num_trt)),
+                  choices = friendly_term_choices(
+                    generate_factor_combinations(num_trt),
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_which,width = "100%")
               )
             )
@@ -2922,7 +3227,11 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='Show comparisons within (optional)',
-                  choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
+                  choices = filter_combinations(
+                    generate_factor_combinations(num_trt),
+                    input$which_para,
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_by,width = "100%")
               )
             )
@@ -3017,7 +3326,10 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "Effect to compare",
-                  choices = friendly_term_choices(generate_spd_factors(num_trt_main,num_trt_sub)),
+                  choices = friendly_term_choices(
+                    generate_spd_factors(num_trt_main,num_trt_sub),
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_which,
                   width = "100%")
               )
@@ -3033,7 +3345,11 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='Show comparisons within (optional)',
-                  choices = filter_combinations(generate_spd_factors(num_trt_main,num_trt_sub),input$which_para),
+                  choices = filter_combinations(
+                    generate_spd_factors(num_trt_main,num_trt_sub),
+                    input$which_para,
+                    display_treatment_label_spec()
+                  ),
                   selected = selected_by,
                   width = "100%")
               )
@@ -3311,7 +3627,10 @@ server<-function(input,output,session) {
     if (length(vec) != expected_length) {
       return(tags$div(style = "color: red;", 
                       paste0("Enter ", expected_length, " coefficients for ",
-                             friendly_term_choices(input$which_para) |> names(),
+                             translate_model_term(
+                               input$which_para,
+                               display_treatment_label_spec()
+                             ),
                              "; ", length(vec), " were provided.")
       ))
     }
@@ -3368,9 +3687,15 @@ server<-function(input,output,session) {
     req(page_started())
     req(!input$design_title %in% c("Split Plot Design", "General Design"))
     factor_count <- levels_num_trt()
+    treatment_spec <- display_treatment_label_spec()
+    available_by_choices <- filter_combinations(
+      generate_factor_combinations(factor_count),
+      input$which_para,
+      treatment_spec
+    )
     updateSelectInput(session=getDefaultReactiveDomain(), "by_para",
-                      choices = filter_combinations(generate_factor_combinations(factor_count), input$which_para),
-                      selected = if (input$by_para %in% filter_combinations(generate_factor_combinations(factor_count), input$which_para)) {
+                      choices = available_by_choices,
+                      selected = if (input$by_para %in% available_by_choices) {
                         input$by_para
                       } else {
                         "NULL"
@@ -3425,6 +3750,12 @@ server<-function(input,output,session) {
     count_error <- active_factor_count_error()
     if (!is.null(count_error)) {
       showNotification(count_error, type = "warning", duration = 8)
+      return(NULL)
+    }
+    naming_spec <- tryCatch(active_treatment_label_spec(), error = function(error) list())
+    naming_error <- validate_treatment_label_spec(naming_spec)
+    if (!is.null(naming_error)) {
+      showNotification(naming_error, type = "warning", duration = 8)
       return(NULL)
     }
     results_generated(FALSE)
@@ -4059,6 +4390,17 @@ server<-function(input,output,session) {
         colnames(result2)<-paste0('V',seq(1:nn))
         results$all<-rbind(c(input$design_title,rep('',nn-1)),c('Results for overall F-test',rep('',nn-1)),result1,'',c('Results for specific contrasts',rep('',nn-1)),result2)
       }
+
+      result_fields <- names(reactiveValuesToList(results))
+      if ("omnibus" %in% result_fields && !is.null(results$omnibus)) {
+        results$omnibus <- translate_power_result_labels(results$omnibus, naming_spec)
+      }
+      if ("contrast" %in% result_fields && !is.null(results$contrast)) {
+        results$contrast <- translate_power_result_labels(results$contrast, naming_spec)
+      }
+      if ("all" %in% result_fields && !is.null(results$all)) {
+        results$all <- translate_power_export(results$all, naming_spec)
+      }
       
       if(input$Type=='F-test'){
         output$download_all <- downloadHandler(
@@ -4133,6 +4475,7 @@ server<-function(input,output,session) {
       tryCatch(factor_types_number(),error=function(e) NULL),
       tryCatch(datavalues$uploaded_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL),
+      tryCatch(active_treatment_label_spec(), error = function(e) NULL),
       tryCatch(input$design_title,error=function(e) NULL)
     )
   }, {

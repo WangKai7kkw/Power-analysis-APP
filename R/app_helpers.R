@@ -161,6 +161,174 @@ normalise_by_factor <- function(by) {
   by
 }
 
+parse_treatment_labels <- function(value) {
+  if (is.null(value) || !nzchar(trimws(value))) return(character(0))
+  trimws(strsplit(value, ",", fixed = TRUE)[[1]])
+}
+
+build_treatment_factor_spec <- function(internal, display_name, level_labels, level_count) {
+  list(
+    internal = internal,
+    name = trimws(value_or_default(display_name, "")),
+    levels = parse_treatment_labels(level_labels),
+    defaults = paste0(internal, seq_len(level_count)),
+    level_count = as.integer(level_count)
+  )
+}
+
+validate_treatment_label_spec <- function(spec) {
+  if (is.null(spec) || length(spec) == 0L) return(NULL)
+
+  factor_names <- vapply(spec, `[[`, character(1), "name")
+  if (any(!nzchar(factor_names))) {
+    return("Enter a name for every treatment factor.")
+  }
+  if (any(grepl(",", factor_names, fixed = TRUE))) {
+    return("Factor names cannot contain commas.")
+  }
+  if (anyDuplicated(tolower(factor_names))) {
+    return("Each treatment factor needs a unique name.")
+  }
+
+  for (factor in spec) {
+    if (length(factor$levels) != factor$level_count) {
+      return(sprintf(
+        "%s needs %d comma-separated level names; %d were provided.",
+        factor$name,
+        factor$level_count,
+        length(factor$levels)
+      ))
+    }
+    if (any(!nzchar(factor$levels))) {
+      return(sprintf("Every level of %s needs a name.", factor$name))
+    }
+    if (anyDuplicated(tolower(factor$levels))) {
+      return(sprintf("Level names for %s must be unique.", factor$name))
+    }
+  }
+
+  NULL
+}
+
+treatment_labels_customised <- function(spec) {
+  if (is.null(spec) || length(spec) == 0L) return(FALSE)
+  any(vapply(spec, function(factor) {
+    !identical(factor$name, factor$internal) ||
+      !identical(factor$levels, factor$defaults)
+  }, logical(1)))
+}
+
+translate_design_labels <- function(labels, spec) {
+  if (!treatment_labels_customised(spec)) return(labels)
+
+  vapply(labels, function(label) {
+    components <- strsplit(label, ":", fixed = TRUE)[[1]]
+    translated <- vapply(components, function(component) {
+      for (factor in spec) {
+        if (!startsWith(component, factor$internal)) next
+        suffix <- substring(component, nchar(factor$internal) + 1L)
+        if (!grepl("^[0-9]+$", suffix)) next
+        level <- suppressWarnings(as.integer(suffix))
+        if (is.na(level) || level < 1L || level > length(factor$levels)) next
+        if (length(spec) == 1L && length(components) == 1L) {
+          return(factor$levels[[level]])
+        }
+        return(paste0(factor$name, ": ", factor$levels[[level]]))
+      }
+      component
+    }, character(1))
+    paste(translated, collapse = " × ")
+  }, character(1), USE.NAMES = FALSE)
+}
+
+translate_model_term <- function(value, spec) {
+  if (!treatment_labels_customised(spec) || is.na(value) || !nzchar(value)) return(value)
+  parts <- trimws(strsplit(value, ":", fixed = TRUE)[[1]])
+  internals <- vapply(spec, `[[`, character(1), "internal")
+  if (!all(parts %in% internals)) return(value)
+  names_by_internal <- setNames(vapply(spec, `[[`, character(1), "name"), internals)
+  paste(unname(names_by_internal[parts]), collapse = " × ")
+}
+
+translate_model_formula_text <- function(value, spec) {
+  if (!treatment_labels_customised(spec) || is.na(value) || !nzchar(value)) return(value)
+
+  internals <- vapply(spec, `[[`, character(1), "internal")
+  display_names <- vapply(spec, `[[`, character(1), "name")
+  replacement_order <- order(nchar(internals), decreasing = TRUE)
+  placeholders <- paste0("<<PWR4EXP_FACTOR_", seq_along(internals), ">>")
+  for (index in replacement_order) {
+    value <- gsub(internals[[index]], placeholders[[index]], value, fixed = TRUE)
+  }
+  for (index in seq_along(placeholders)) {
+    value <- gsub(placeholders[[index]], display_names[[index]], value, fixed = TRUE)
+  }
+  value
+}
+
+translate_free_treatment_text <- function(value, spec) {
+  if (!treatment_labels_customised(spec) || is.na(value) || !nzchar(value)) return(value)
+
+  tokens <- unlist(lapply(spec, function(factor) {
+    paste0(factor$internal, seq_along(factor$levels))
+  }), use.names = FALSE)
+  replacements <- unlist(lapply(spec, function(factor) {
+    if (length(spec) == 1L) {
+      factor$levels
+    } else {
+      paste0(factor$name, ": ", factor$levels)
+    }
+  }), use.names = FALSE)
+  order <- order(nchar(tokens), decreasing = TRUE)
+  placeholders <- paste0("<<PWR4EXP_LEVEL_", seq_along(tokens), ">>")
+  for (index in order) {
+    value <- gsub(tokens[[index]], placeholders[[index]], value, fixed = TRUE)
+  }
+  for (index in seq_along(placeholders)) {
+    value <- gsub(placeholders[[index]], replacements[[index]], value, fixed = TRUE)
+  }
+  value
+}
+
+translate_power_result_labels <- function(result, spec) {
+  if (is.null(result) || !treatment_labels_customised(spec)) return(result)
+  result <- as.data.frame(result, check.names = FALSE)
+  columns <- trimws(names(result))
+
+  for (index in which(columns == "F-test")) {
+    result[[index]] <- vapply(
+      as.character(result[[index]]),
+      translate_model_term,
+      character(1),
+      spec = spec
+    )
+  }
+  for (index in which(columns %in% c("Contrast", "Variable"))) {
+    result[[index]] <- vapply(
+      as.character(result[[index]]),
+      translate_free_treatment_text,
+      character(1),
+      spec = spec
+    )
+  }
+  result
+}
+
+translate_power_export <- function(result, spec) {
+  if (is.null(result) || !treatment_labels_customised(spec)) return(result)
+  result_matrix <- as.matrix(result)
+  translated <- vapply(as.character(result_matrix), function(value) {
+    term <- translate_model_term(value, spec)
+    if (!identical(term, value)) term else translate_free_treatment_text(value, spec)
+  }, character(1))
+  dim(translated) <- dim(result_matrix)
+  dimnames(translated) <- dimnames(result_matrix)
+  if (is.data.frame(result)) {
+    return(as.data.frame(translated, stringsAsFactors = FALSE, check.names = FALSE))
+  }
+  translated
+}
+
 build_crd_design <- function(...) pwr4exp::designCRD(...)
 build_rcbd_design <- function(...) pwr4exp::designRCBD(...)
 build_latin_square_design <- function(...) pwr4exp::designLSD(...)

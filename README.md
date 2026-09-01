@@ -65,6 +65,7 @@ The app supports power analysis for a variety of standard experimental designs a
 
 - **Three-panel interface**: Design setup, Power Calculation settings, and Results display
 - **Flexible factor specification**: Define up to eight treatment factors with any number of levels
+- **Custom treatment names**: Replace generated factor and level labels with study-specific names that carry through the model preview, interaction and t-test selectors, assumption tables, results, and CSV exports
 - **Interaction effects**: Optionally include interaction terms between factors
 - **Means input**: Enter treatment means via an interactive table (cell means for full-factorial models, marginal means for additive models)
 - **Variance input**: Specify variance components for each random effect (block, row, column, main-plot, error)
@@ -86,6 +87,8 @@ Fill in the **Design** panel on the left:
 - **CRD / RCBD / LSD**: Set the number of treatment factors and their levels. For RCBD, enter the number of blocks. For LSD, set the number of replicated squares and the block-reuse option (`row`, `col`, or `none`).
 - **Split-Plot Design**: Set the number of main-plot factors and sub-plot factors, their levels, and the number of main-plot replicates per treatment.
 - **General Design**: Upload a data file and specify the model formula (e.g., `~ fA + fB + (1|block)`) and an optional residual correlation structure (e.g., `corAR1(value=0.6, form=~fA|fC)`).
+
+For standard designs, use **Treatment names** to replace generated labels such as `trt1` or `facA1` with the factor and level names used in your study. Enter one comma-separated level name for every configured level. These names appear consistently throughout the workflow and in exports; the underlying statistical model is unchanged.
 
 For designs with multiple factors, choose whether to include interaction terms and select the desired interaction combinations.
 
