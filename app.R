@@ -16,31 +16,441 @@ if (length(missing_packages)) {
 invisible(lapply(runtime_packages, library, character.only = TRUE))
 source(file.path("R", "app_helpers.R"), local = TRUE)
 
+section_header <- function(icon_name, title, description) {
+  div(
+    class = "section-heading",
+    div(class = "section-icon", icon(icon_name)),
+    div(
+      tags$h3(title),
+      tags$p(description)
+    )
+  )
+}
+
+panel_header <- function(step, eyebrow, title, description) {
+  div(
+    class = "panel-heading",
+    div(class = "step-badge", step),
+    div(
+      div(class = "panel-eyebrow", eyebrow),
+      tags$h2(title),
+      tags$p(description)
+    )
+  )
+}
+
+field_note <- function(...) {
+  div(class = "field-note", icon("circle-info"), tags$span(...))
+}
+
+friendly_term_choices <- function(values) {
+  labels <- values
+  labels <- gsub("trt\\.main", "Whole-plot treatment", labels)
+  labels <- gsub("trt\\.sub", "Subplot treatment", labels)
+  labels <- gsub("fac([A-Z])\\.main", "Whole-plot factor \\1", labels)
+  labels <- gsub("fac([A-Z])\\.sub", "Subplot factor \\1", labels)
+  labels <- gsub("fac([A-Z])", "Factor \\1", labels)
+  labels <- gsub(":", " × ", labels, fixed = TRUE)
+  stats::setNames(values, labels)
+}
+
+friendly_contrast_choices <- function(values) {
+  labels <- c(
+    pairwise = "All pairwise comparisons",
+    poly = "Polynomial trend contrasts",
+    trt.vs.ctrl = "Each treatment versus control",
+    `Contrast vector` = "Custom coefficient vector"
+  )
+  stats::setNames(values, unname(labels[values]))
+}
+
+result_table_block <- function(title, description, output) {
+  div(
+    class = "result-block",
+    tags$h3(title),
+    tags$p(description),
+    div(class = "result-table-wrap", output)
+  )
+}
+
+interpretation_guide <- function() {
+  div(
+    class = "interpretation-note",
+    tags$strong("How to read power: "),
+    "Power is the probability of detecting the specified effect under these assumptions. Values nearer 1 indicate a greater chance of detection. A target such as 0.80 is common, but the appropriate threshold depends on the scientific and practical consequences of a missed effect."
+  )
+}
+
+result_empty_state <- function(stale = FALSE) {
+  div(
+    class = "result-empty",
+    div(
+      div(class = "result-empty-icon", icon(if (stale) "rotate" else "chart-column")),
+      tags$h3(if (stale) "Assumptions changed" else "Results will appear here"),
+      tags$p(if (stale) {
+        "Run the analysis again so the displayed power matches your updated assumptions."
+      } else {
+        "Complete the design assumptions, choose the result type, and select Run power analysis."
+      })
+    )
+  )
+}
+
+app_css <- "
+  :root {
+    --ink: #17243d;
+    --muted: #60708a;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --primary-soft: #eff6ff;
+    --accent: #0f766e;
+    --surface: #ffffff;
+    --surface-subtle: #f7f9fc;
+    --border: #dce3ee;
+    --warning-soft: #fff8e6;
+    --danger: #b42318;
+    --success: #18794e;
+    --shadow: 0 10px 30px rgba(23, 36, 61, .08);
+  }
+
+  html, body, .bslib-page-fill {
+    min-height: 100%;
+    height: auto !important;
+  }
+
+  body {
+    margin: 0;
+    overflow-y: auto !important;
+    background: #f3f6fb;
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .app-shell {
+    width: min(1760px, 100%);
+    margin: 0 auto;
+    padding: 24px 28px 32px;
+  }
+
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 18px;
+  }
+
+  .brand-lockup { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    color: #fff;
+    background: linear-gradient(145deg, #2563eb, #0f766e);
+    box-shadow: 0 8px 18px rgba(37, 99, 235, .22);
+    font-size: 18px;
+  }
+  .brand-name { font-size: 21px; font-weight: 780; letter-spacing: -.02em; }
+  .brand-tagline { color: var(--muted); font-size: 13px; margin-top: -2px; }
+
+  .about-button {
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    color: var(--ink) !important;
+    font-weight: 650 !important;
+    padding: 9px 14px !important;
+  }
+
+  .design-selector-card {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(340px, 620px);
+    align-items: end;
+    gap: 32px;
+    padding: 24px 26px;
+    border: 1px solid #cfe0ff;
+    border-radius: 18px;
+    background: linear-gradient(120deg, #fff 20%, #eff6ff 100%);
+    box-shadow: var(--shadow);
+  }
+  .design-selector-card h1 {
+    margin: 0 0 6px;
+    font-size: clamp(26px, 2vw, 34px);
+    line-height: 1.15;
+    letter-spacing: -.035em;
+    font-weight: 780;
+  }
+  .design-selector-card p { margin: 0; max-width: 690px; color: var(--muted); }
+  .design-control { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: end; }
+  .design-control .form-group { margin-bottom: 0; }
+  .step-kicker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 38px;
+    margin-bottom: 1px;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 750;
+  }
+
+  .workflow-map {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .workflow-map-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 650;
+  }
+  .workflow-map-item span {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e5edfa;
+    color: #36506f;
+    font-size: 12px;
+  }
+
+  .app-panels {
+    display: grid;
+    grid-template-columns: minmax(380px, 1.15fr) minmax(300px, .78fr) minmax(370px, 1.07fr);
+    grid-template-areas: 'design test results';
+    gap: 18px;
+    align-items: start;
+  }
+  .design-panel { grid-area: design; }
+  .test-panel { grid-area: test; }
+  .results-panel { grid-area: results; }
+
+  .workflow-card.card {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .workflow-card > .card-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+  }
+  .panel-heading { display: flex; align-items: flex-start; gap: 13px; }
+  .step-badge {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-weight: 800;
+  }
+  .panel-eyebrow {
+    color: var(--primary-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+  .panel-heading h2 { margin: 1px 0 2px; font-size: 19px; line-height: 1.25; font-weight: 750; }
+  .panel-heading p { margin: 0; color: var(--muted); font-size: 13px; font-weight: 400; }
+  .panel-body { padding: 18px 20px 20px; }
+  .panel-scroll { max-height: calc(100vh - 330px); overflow: auto; scrollbar-gutter: stable; }
+
+  #dynamic_sidebar > .card,
+  #dynamic_sidebar > .shiny-html-output > .card,
+  #dynamic_sidebar .card {
+    margin: 0 0 14px !important;
+    padding: 16px !important;
+    height: auto !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 13px !important;
+    background: var(--surface-subtle) !important;
+    box-shadow: none !important;
+  }
+  .section-heading { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 13px; }
+  .section-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: #eaf1ff;
+    color: var(--primary-dark);
+  }
+  .section-heading h3 { margin: 0; font-size: 16px; font-weight: 740; }
+  .section-heading p { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+  label, .control-label { margin-bottom: 6px !important; color: #263650; font-size: 13px; font-weight: 650 !important; }
+  .form-group { margin-bottom: 14px; }
+  .form-control, .selectize-input, .selectize-control.single .selectize-input {
+    min-height: 40px;
+    border-color: #cbd5e1;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: none !important;
+    font-size: 14px;
+  }
+  .form-control:focus, .selectize-input.focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .13) !important;
+  }
+  .field-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin: -6px 0 13px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .field-note svg, .field-note i { margin-top: 2px; color: var(--primary); }
+  .model-preview {
+    margin: 2px 0 14px;
+    padding: 12px 13px;
+    border: 1px solid #cfe0ff;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    color: #29466c;
+    font-size: 13px;
+  }
+  .model-preview strong { display: block; margin-bottom: 4px; color: #1f3b63; }
+
+  .btn-primary {
+    border-color: var(--primary) !important;
+    border-radius: 10px !important;
+    background: var(--primary) !important;
+    font-weight: 700 !important;
+    min-height: 44px;
+    box-shadow: 0 7px 14px rgba(37, 99, 235, .18);
+  }
+  .btn-primary:hover { border-color: var(--primary-dark) !important; background: var(--primary-dark) !important; }
+  #create_result { margin-top: 8px; }
+
+  .result-empty {
+    display: grid;
+    place-items: center;
+    min-height: 290px;
+    padding: 34px 24px;
+    text-align: center;
+    border: 1px dashed #bdc9d9;
+    border-radius: 13px;
+    background: var(--surface-subtle);
+  }
+  .result-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 13px;
+    border-radius: 14px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: 20px;
+  }
+  .result-empty h3 { margin: 0 0 6px; font-size: 17px; }
+  .result-empty p { margin: 0 auto; max-width: 370px; color: var(--muted); font-size: 13px; }
+  .result-block { margin-bottom: 16px; }
+  .result-block h3 { margin: 0 0 4px; font-size: 16px; font-weight: 740; }
+  .result-block > p { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+  .result-table-wrap {
+    overflow-x: auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: #fff;
+  }
+  .result-table-wrap table { margin-bottom: 0 !important; font-size: 13px; white-space: nowrap; }
+  .result-table-wrap th { color: #31435f; background: #f5f8fc; }
+  .interpretation-note {
+    margin-top: 15px;
+    padding: 13px 14px;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 9px 9px 0;
+    background: #effaf8;
+    color: #34524f;
+    font-size: 12px;
+  }
+  .download-area { margin-top: 14px; }
+  .download-area .btn { width: 100%; }
+  .download-placeholder {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: #7a879a;
+    background: #f6f8fb;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .alert { border-radius: 10px; font-size: 13px; }
+  .shiny-notification { border-radius: 11px !important; box-shadow: var(--shadow); }
+  .modal-content { overflow: hidden; border: 0; border-radius: 18px; box-shadow: 0 24px 70px rgba(23,36,61,.28); }
+  .modal-dialog { width: min(92%, 620px) !important; max-width: 620px !important; margin: 7vh auto 0 !important; }
+  .welcome-modal { padding: 34px 34px 28px; text-align: left; }
+  .welcome-modal .welcome-icon {
+    display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+    background: linear-gradient(145deg, #2563eb, #0f766e); color: #fff; font-size: 20px;
+  }
+  .welcome-modal h2 { margin: 20px 0 8px; font-size: 28px; letter-spacing: -.03em; }
+  .welcome-modal .lead { margin: 0 0 17px; color: var(--muted); font-size: 16px; }
+  .welcome-checklist { display: grid; gap: 9px; margin: 20px 0 24px; padding: 0; list-style: none; }
+  .welcome-checklist li { display: flex; gap: 9px; align-items: flex-start; color: #3a4b65; font-size: 14px; }
+  .welcome-checklist i, .welcome-checklist svg { margin-top: 3px; color: var(--success); }
+  .welcome-byline { margin: 18px 0 0; color: #7a879a; font-size: 12px; text-align: center; }
+
+  @media (max-width: 1280px) {
+    .app-panels {
+      grid-template-columns: minmax(420px, 1.1fr) minmax(330px, .9fr);
+      grid-template-areas: 'design test' 'design results';
+    }
+    .panel-scroll { max-height: none; }
+  }
+
+  @media (max-width: 860px) {
+    .app-shell { padding: 16px 14px 26px; }
+    .design-selector-card { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+    .app-panels { grid-template-columns: 1fr; grid-template-areas: 'design' 'test' 'results'; }
+    .workflow-map { grid-template-columns: repeat(2, 1fr); }
+    .app-topbar { align-items: flex-start; }
+  }
+
+  @media (max-width: 520px) {
+    .brand-tagline { display: none; }
+    .about-button { font-size: 13px !important; }
+    .design-control { grid-template-columns: 1fr; }
+    .step-kicker { display: none; }
+    .workflow-map { gap: 2px; }
+    .workflow-map-item { padding: 8px 5px; font-size: 11px; }
+    .workflow-card > .card-header, .panel-body { padding: 15px; }
+    .welcome-modal { padding: 26px 22px 22px; }
+  }
+"
+
 ui <- page_fillable(
-  theme = bs_theme(preset = "cosmo"),
+  theme = bs_theme(preset = "cosmo", primary = "#2563eb"),
   tags$head(
-    tags$style(HTML("
-    .modal-backdrop.show {
-        backdrop-filter: blur(5px); 
-        opacity: 0.6 !important;
-    }
-    .modal-dialog {
-        margin-top: 10vh !important;
-        width: 50% !important;
-        max-width: 700px !important;
-    }
-    @media (max-width: 1100px) {
-        .app-panels {
-            flex-direction: column;
-            height: auto !important;
-        }
-        .app-panel {
-            flex: 1 1 auto !important;
-            width: 100%;
-            min-height: 520px;
-        }
-    }
-  "))
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$style(HTML(app_css))
   ),
   uiOutput("main_ui")
 )
@@ -49,90 +459,83 @@ server<-function(input,output,session) {
   
   page_started <- reactiveVal(FALSE)
   results_generated <- reactiveVal(FALSE)
+  design_revision <- reactiveVal(0L)
   
   ui_main<-function(){
     div(
-      tags$style(HTML("
-          .card-header h4 {
-              text-align: center !important;
-             width: 100%;
-             font-weight: 700 !important;
-            }
-         ")),
-      div(
-        style = "position: absolute; top: 10px; right: 20px; z-index: 1000;",
+      class = "app-shell",
+      tags$header(
+        class = "app-topbar",
+        div(
+          class = "brand-lockup",
+          div(class = "brand-mark", icon("chart-line")),
+          div(
+            div(class = "brand-name", "pwr4exp"),
+            div(class = "brand-tagline", "Power analysis for designed experiments")
+          )
+        ),
         tags$div(class = "dropdown",
                  tags$button(
-                   "About pwr4exp",
-                   class = "btn btn-light dropdown-toggle",
+                   tagList(icon("circle-info"), " About & resources"),
+                   class = "btn btn-light dropdown-toggle about-button",
                    type = "button",
                    `data-bs-toggle` = "dropdown",
-                   `aria-expanded` = "false",
-                   style = "
-                        font-size:16px;
-                        color:#000; 
-                        background-color:#fff; 
-                        border: 1px solid #ccc;
-                        box-shadow: none;
-                      "
+                   `aria-expanded` = "false"
                  ),
                  tags$ul(
                    class = "dropdown-menu",
                    tags$li(
-                     tags$a("Source code",rel="noopener noreferrer", class="dropdown-item", href="https://github.com/an-ethz/pwr4exp", target="_blank")
+                     tags$a(icon("code-branch"), " Package source code", rel="noopener noreferrer", class="dropdown-item", href="https://github.com/an-ethz/pwr4exp", target="_blank")
                    ),
                    tags$li(
-                     tags$a("Docs",rel="noopener noreferrer", class="dropdown-item", href="https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html", target="_blank")
+                     tags$a(icon("book-open"), " Method documentation", rel="noopener noreferrer", class="dropdown-item", href="https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html", target="_blank")
                    )
                  )
         )
       ),
       div(
-        style = "display: flex; align-items: flex-start; gap: 20px; margin-bottom: 5px; width: 500px;margin-top:-10px;",
-        tags$span("Select Design", 
-                  style = "font-size:22px; 
-                          font-weight:800; 
-                          white-space: nowrap;
-                          margin-top: 4px;
-                          padding-left: 10px;
-                          border-left: 4px solid #0074D9;"),
+        class = "design-selector-card",
         div(
-          style = "flex-grow: 1;margin-top: 0px;",
+          tags$h1("Plan your power analysis"),
+          tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
+        ),
+        div(
+          class = "design-control",
+          div(class = "step-kicker", "1"),
           selectInput(
             inputId = "design_title",
-            label = NULL,
+            label = "Experimental design",
             choices = c(
-              "Completely Randomized Design", 
-              "Randomized Complete Block Design",
-              "Latin Square Design",
-              "Split Plot Design",
-              "General Design"
+              "Completely randomized (CRD)" = "Completely Randomized Design",
+              "Randomized complete block (RCBD)" = "Randomized Complete Block Design",
+              "Latin square" = "Latin Square Design",
+              "Split-plot" = "Split Plot Design",
+              "Custom design from uploaded data" = "General Design"
             ),
             selected = "Completely Randomized Design",
             width = '100%'
           )
-        ),
-        tags$style(HTML("
-    #design_title + .selectize-control .selectize-input {
-      font-size: 18px !important;
-      height: 30px;       
-      line-height: 30px;
-    }
-  "))
+        )
+      ),
+      tags$nav(
+        class = "workflow-map",
+        `aria-label` = "Power analysis workflow",
+        div(class = "workflow-map-item", tags$span("1"), "Choose a design"),
+        div(class = "workflow-map-item", tags$span("2"), "Enter assumptions"),
+        div(class = "workflow-map-item", tags$span("3"), "Configure the test"),
+        div(class = "workflow-map-item", tags$span("4"), "Review & export")
       ),
       
       div(
         class = "app-panels",
-        style = "display: flex; gap: 25px; width: 100%;height: 90vh;",
         
         div(
-          class = "app-panel",
-          style = "flex: 0 0 28%; min-width: 200px;display: flex; flex-direction: column; height: 100%;",
+          class = "app-panel design-panel",
           card(
-            style = "flex: 1; display: flex; flex-direction: column;",
-            card_header(HTML("<h4>Design</h4>")),
+            class = "workflow-card",
+            card_header(panel_header("2", "Design assumptions", "Describe the study", "Set factor levels, sample size, expected means, and sources of variation.")),
             div(
-              style = "flex: 1; margin-top: 2px; padding-top: 2px;",
+              class = "panel-body panel-scroll",
               uiOutput("dynamic_sidebar")
             ),
             full_screen = TRUE
@@ -140,22 +543,25 @@ server<-function(input,output,session) {
         ),
         
         div(
-          class = "app-panel",
-          style = "flex: 0 0 28%; min-width: 200px;display: flex; flex-direction: column; height: 100%;",
+          class = "app-panel test-panel",
           card(
-            style = "flex: 1; display: flex; flex-direction: column;",
-            card_header(HTML("<h4>Power Calculation</h4>")),
+            class = "workflow-card",
+            card_header(panel_header("3", "Analysis settings", "Choose what to test", "Use an overall F-test, focused contrasts, or both.")),
             div(
-              style = "flex: 1; overflow-y: auto; padding-top: 2px;width:100%;",
+              class = "panel-body panel-scroll",
               div(
-                style='flex:1;',
                 selectInput(
                   inputId = 'Type',
-                  label = 'Type of test',
-                  choices = c('F-test', 't-test', 'F-test & t-test'),
+                  label = 'Power results to calculate',
+                  choices = c(
+                    'Overall effects (F-test)' = 'F-test',
+                    'Specific comparisons (t-tests)' = 't-test',
+                    'Overall effects and comparisons' = 'F-test & t-test'
+                  ),
                   selected = 'F-test',
                   width = "100%"
-                )
+                ),
+                field_note("Choose overall effects for a first-pass analysis; add comparisons when particular treatment differences are your main question.")
               ),
               uiOutput('test_options_ui')
             ),
@@ -164,32 +570,38 @@ server<-function(input,output,session) {
         ),
         
         div(
-          class = "app-panel",
-          style = "flex: 0 0 44%; min-width: 300px;display: flex; flex-direction: column; height: 100%;",
+          class = "app-panel results-panel",
           card(
-            style = "flex: 1; display: flex; flex-direction: column;",
-            card_header(HTML("<h4>Power Analysis Results</h4>")),
+            class = "workflow-card",
+            card_header(panel_header("4", "Decision support", "Review the results", "Compare power across effects and download a record of the analysis.")),
             div(
-              style = "flex: 1;height: 100%; overflow-y: auto;",
+              class = "panel-body panel-scroll",
               uiOutput("results_display")
             ),
             div(
-              style = "flex: 0 0 auto; display: flex; justify-content: center; margin-top: 10px;",
-              downloadButton("download_all", "Download Results",
-                             class = "btn-primary",
-                             style = "width: 100%;")
+              class = "panel-body download-area",
+              uiOutput("download_actions")
             ),
             full_screen = TRUE
           )
         )
-      ),
-      
-      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+      )
     )
   }
   
   output$main_ui <- renderUI({
     ui_main()
+  })
+
+  output$download_actions <- renderUI({
+    if (isTRUE(results_generated())) {
+      tagList(
+        downloadButton("download_all", tagList(icon("download"), " Download results as CSV"), class = "btn-primary"),
+        field_note("The export includes the selected design and the result tables currently shown above.")
+      )
+    } else {
+      div(class = "download-placeholder", icon("lock"), " Run the calculation to enable download")
+    }
   })
   
   observe({
@@ -202,41 +614,22 @@ server<-function(input,output,session) {
           fade = TRUE,
           
           div(
-            style = "
-            width:100%; 
-            height:100%; 
-            text-align:center;
-            padding:20px;
-          ",
-            
-            h2(HTML("Welcome to <b><span style='font-weight:900;'>pwr4exp</span></b> app")),
-            
-            p(
-              "Power Analysis for Research Experiments",
-              style='margin-top:20px; font-size:20px;'
+            class = "welcome-modal",
+            div(class = "welcome-icon", icon("chart-line")),
+            h2("Plan an experiment with confidence"),
+            p(class = "lead", "Estimate statistical power for standard and custom experiments analyzed with linear mixed models."),
+            tags$ul(
+              class = "welcome-checklist",
+              tags$li(icon("circle-check"), tags$span("Choose the design that matches how treatments are assigned.")),
+              tags$li(icon("circle-check"), tags$span("Enter plausible means and variance estimates from prior data or a pilot study.")),
+              tags$li(icon("circle-check"), tags$span("Calculate overall or comparison-specific power, then export the results."))
             ),
-            
-            p(
-              "Provides tools for calculating statistical power for experiments analyzed using linear mixed models. It supports standard designs, including randomized block, split-plot, and Latin Square designs, while offering flexibility to accommodate a variety of other complex study designs.",
-              style="
-              max-width:700px;
-              margin:auto;
-              margin-top:20px;
-              font-size:16px;
-              line-height:1.5;
-            "
-            ),
-            
             actionButton(
-              "start_btn", "Start",
+              "start_btn", tagList("Start planning ", icon("arrow-right")),
               class = "btn btn-primary",
-              style="margin-top:30px; font-size:20px; padding:10px 30px;"
+              style="width:100%;"
             ),
-            
-            p(
-              "Authors: Ao Wang and Kai Wang",
-              style="margin-top:40px; font-size:24px; font-weight:500;"
-            )
+            p(class = "welcome-byline", "Developed by Ao Wang and Kai Wang")
           ),
           
           footer = NULL
@@ -249,6 +642,12 @@ server<-function(input,output,session) {
     page_started(TRUE)
     removeModal()
   })
+
+  observeEvent(input$design_title, {
+    session$onFlushed(function() {
+      design_revision(isolate(design_revision()) + 1L)
+    }, once = TRUE)
+  }, ignoreInit = TRUE)
   
   generate_factor_combinations <- function(n){
     generate_factor_combinations_safe(n)
@@ -274,13 +673,15 @@ server<-function(input,output,session) {
   }
   
   filter_combinations <- function(all_combinations, exclude_factors) {
-    if (length(exclude_factors) == 0) return(all_combinations)
+    if (length(exclude_factors) == 0) return(friendly_term_choices(all_combinations))
     exclude_factors <- unlist(strsplit(exclude_factors, "\\:"))
     filtered <- sapply(all_combinations, function(comb) {
       factors <- unlist(strsplit(comb, "\\:"))
       !any(factors %in% exclude_factors)
     })
-    c("NULL", all_combinations[filtered])
+    values <- c("NULL", all_combinations[filtered])
+    labels <- c("No conditioning variable", unname(names(friendly_term_choices(all_combinations[filtered]))))
+    stats::setNames(values, labels)
   }
   
   generate_spd_factors <- function(num_trt_main, num_trt_sub) {
@@ -323,12 +724,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Treatments", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_trt", "Number of treatment factors", 
+                  numericInput("num_trt", "Treatment factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
                                step = 1,
                                width = '100%')
@@ -343,12 +743,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Sample Size", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("users", "Replication", "Set how many independent experimental units receive each treatment combination."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_rep", "Number of replicates per treatment", 
+                  numericInput("num_rep", "Replicates per treatment combination",
                                value = 8,min=1,width='100%')
               )
           )
@@ -357,8 +756,7 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Model", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("diagram-project", "Analysis model", "Review the generated model and include interactions only when scientifically meaningful."),
           
           uiOutput('model_ui'),
           uiOutput('interaction_exist_ui'),
@@ -376,12 +774,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Treatments", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
           
           div(style = "display: flex; align-items: center;width:100%;;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_trt", "Number of treatment factors", 
+                  numericInput("num_trt", "Treatment factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
                                step = 1,
                                width = "100%")
@@ -395,12 +792,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Sample Size", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("table-cells-large", "Blocks", "Each complete block contains every treatment combination once."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_block", "Number of blocks", value = 8,min=1,width="100%")
+                  numericInput("num_block", "Complete blocks", value = 8,min=1,width="100%")
               )
           )
         ),
@@ -408,8 +804,7 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Model", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("diagram-project", "Analysis model", "The generated model includes a random intercept for block."),
           
           uiOutput('interaction_exist_ui'),
           uiOutput('interaction_fac_ui'),
@@ -427,12 +822,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Treatments", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("layer-group", "Treatment structure", "Define the treatments arranged within each square."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_trt", "Number of treatment factors", 
+                  numericInput("num_trt", "Treatment factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
                                step = 1,
                                width = "100%")
@@ -446,12 +840,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Sample Size", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("border-all", "Square replication", "Set the number of squares and whether row or column blocks repeat across them."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_squares", "Number of replicated squares", value = 4,min=1,width = '100%')
+                  numericInput("num_squares", "Replicated squares", value = 4,min=1,width = '100%')
               )
           ),
           
@@ -461,8 +854,8 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "value_reuse",
-                label = "Reuse blocks",
-                choices = c('row','col','none'),
+                label = "Blocks reused across squares",
+                choices = c("Reuse row blocks" = 'row', "Reuse column blocks" = 'col', "Use new row and column blocks" = 'none'),
                 selected = "none",
                 width = "100%")
             ),
@@ -476,8 +869,7 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Model", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("diagram-project", "Analysis model", "The generated model includes random row and column effects."),
           
           uiOutput('interaction_exist_ui'),
           uiOutput('interaction_fac_ui'),
@@ -493,12 +885,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Treatments", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("layer-group", "Treatment structure", "Separate factors applied to whole plots from those applied within plots."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_trt_main", "Number of main plot factors", 
+                  numericInput("num_trt_main", "Whole-plot factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
                                step = 1,
                                width="100%")
@@ -511,7 +902,7 @@ server<-function(input,output,session) {
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_trt_sub", "Number of sub plot factors",
+                  numericInput("num_trt_sub", "Subplot factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
                                step = 1,
                                width="100%")
@@ -525,12 +916,11 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Sample Size", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("users", "Whole-plot replication", "Set the number of independent whole plots assigned to each whole-plot treatment."),
           
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
-                  numericInput("num_rep", "Number of replicates (main plots) per main plot treatment", 
+                  numericInput("num_rep", "Whole plots per whole-plot treatment",
                                value = 10,min=1,width="100%")
               )
           )
@@ -539,8 +929,7 @@ server<-function(input,output,session) {
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
-          tags$p("Model", 
-                 style='font-weight: bold; font-size:20px; color: #333; margin: 0 0 2px 0;'),
+          section_header("diagram-project", "Analysis model", "The generated model accounts for whole-plot variation separately from residual error."),
           
           uiOutput('interaction_exist_ui'),
           uiOutput('interaction_fac_ui'),
@@ -554,18 +943,10 @@ server<-function(input,output,session) {
       )
     }else if(input$design_title=='General Design'){
       tagList(
+        bslib::card(
         div(
           style = "display: flex; flex-direction: column;width:100%;",
-          
-          div(
-            "Upload data file (.csv, .xlsx, .xls, .txt, .tsv)",
-            style = "font-weight: bold; margin-bottom: 2px;"
-          ),
-          
-          div(
-            "Note: A data frame with all independent variables in columns, matching the design's data structure.",
-            style = "font-size: 14px; color: #555; margin-bottom: 4px;"
-          )
+          section_header("file-arrow-up", "Study layout", "Upload one row per observation or planned observation, with a separate column for each design variable.")
         ),
         
         div(
@@ -574,26 +955,30 @@ server<-function(input,output,session) {
             style='flex:1;',
             fileInput(
               inputId = "uploaded_file",
-              label = NULL,
+              label = "Study data",
               accept = c(".csv", ".xlsx",".xls", ".txt", ".tsv"),
-              buttonLabel = "Browse...",
-              placeholder = "No file selected",
+              buttonLabel = "Choose file",
+              placeholder = "CSV, Excel, TSV, or TXT",
               width = "100%")
           )
         ),
+        field_note("The app reads the column names from this file and uses them in the model and correlation settings."),
         
         uiOutput("file_feedback"),
         
-        uiOutput("file_type_check"),
+        uiOutput("file_type_check")
+        ),
+        bslib::card(
+        section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your uploaded data."),
         
         div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
             div(style="flex:1;",
-                textInput("Formula_general", "Input Formula",
-                          placeholder = "e.g., ~ fA + fB",width = "100%")
+                textInput("Formula_general", "Model formula",
+                          placeholder = "For example: ~ treatment + time + (1 | subject)",width = "100%")
             ),
             tags$span(
               `data-toggle` = "tooltip",
-              title = "Note: A right-hand-side formula specifying the model, with terms on the right of ~ , following lme4::lmer syntax for random effects.",
+              title = "Enter the right-hand side only, beginning with ~. Random effects follow lme4 syntax, such as (1 | block).",
               style = "margin-left: 5px; cursor: pointer;",
               icon("question-circle")
             )
@@ -605,19 +990,19 @@ server<-function(input,output,session) {
             div(style="flex:1;",
                 selectInput(
                   "cor_type",
-                  "Residual correlation structure",
+                  "Within-group residual correlation",
                   choices = c(
-                    "None" = "none",
-                    "corAR1 \u2013 First-order autoregressive" = "corAR1",
-                    "corARMA \u2013 Autoregressive moving average" = "corARMA",
-                    "corCAR1 \u2013 Continuous-time autoregressive" = "corCAR1",
-                    "corCompSymm \u2013 Compound symmetry" = "corCompSymm",
-                    "corExp \u2013 Exponential spatial correlation" = "corExp",
-                    "corGaus \u2013 Gaussian spatial correlation" = "corGaus",
-                    "corLin \u2013 Linear spatial correlation" = "corLin",
-                    "corSymm \u2013 Unstructured correlation" = "corSymm",
-                    "corRatio \u2013 Ratio-based spatial correlation" = "corRatio",
-                    "corSpher \u2013 Spherical spatial correlation" = "corSpher"
+                    "Independent residuals (none)" = "none",
+                    "AR(1): equally spaced repeated measures" = "corAR1",
+                    "ARMA: autoregressive moving average" = "corARMA",
+                    "Continuous AR(1): unequally spaced time" = "corCAR1",
+                    "Compound symmetry: constant correlation" = "corCompSymm",
+                    "Exponential spatial correlation" = "corExp",
+                    "Gaussian spatial correlation" = "corGaus",
+                    "Linear spatial correlation" = "corLin",
+                    "Unstructured correlation" = "corSymm",
+                    "Ratio-based spatial correlation" = "corRatio",
+                    "Spherical spatial correlation" = "corSpher"
                   ),
                   selected = "none",
                   width = "100%"
@@ -633,8 +1018,10 @@ server<-function(input,output,session) {
               icon("question-circle")
             )
         ),
+        field_note("Leave this as independent residuals unless observations within a subject, plot, or location are expected to remain correlated."),
         uiOutput("cor_params_ui"),
-        uiOutput("cor_validation_ui"),
+        uiOutput("cor_validation_ui")
+        ),
         uiOutput('input_data_ui'),
         uiOutput('input_variance_ui'),
         tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
@@ -692,8 +1079,9 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Levels of each factor",
+      tags$label("Levels per treatment factor",
                  style = "margin-bottom: 10px; display: block;"),
+      field_note("Enter the number of categories or treatment settings for each factor (minimum 2)."),
       div(
         style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
         num_inputs
@@ -752,8 +1140,9 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Levels of each main-plot factor",
+      tags$label("Levels per whole-plot factor",
                  style = "margin-bottom: 10px; display: block;"),
+      field_note("Enter the number of settings applied at the whole-plot level."),
       div(
         style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
         num_inputs_main
@@ -812,8 +1201,9 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Levels of each sub-plot factor",
+      tags$label("Levels per subplot factor",
                  style = "margin-bottom: 10px; display: block;"),
+      field_note("Enter the number of settings applied within each whole plot."),
       div(
         style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
         num_inputs_sub
@@ -855,10 +1245,10 @@ server<-function(input,output,session) {
         
         if (is.null(df)) {
           tags$div(style = "color: red; font-weight: bold;margin-bottom: 10px;",
-                   "Please upload file.")
+                   "The file could not be read. Check that it is not empty and uses a supported format, then choose it again.")
         } else {
           tags$div(style = "color: green; font-weight: bold;margin-bottom: 10px;",
-                   paste("File successfully uploaded with", nrow(df), "rows and", ncol(df), "columns."))
+                   paste("File ready:", nrow(df), "rows and", ncol(df), "columns detected."))
         }
       })
     }
@@ -878,7 +1268,7 @@ server<-function(input,output,session) {
         selectInput(
           inputId = paste0("factor_type_", i),
           label = col_name,
-          choices = c("Categorical", "Continuous"),
+          choices = c("Categorical factor" = "Categorical", "Continuous covariate" = "Continuous"),
           selected = "Categorical",
           width = "160px"
         )
@@ -911,8 +1301,9 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Type of factor",
+      tags$label("Role of each data column",
                  style = "margin-bottom: 10px; display: block;font-weight: bold"),
+      field_note("Categorical columns define groups or levels; continuous columns contain numeric covariates such as time or dose."),
       div(
         style = "font-size: 12px;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
         type_inputs
@@ -968,7 +1359,7 @@ server<-function(input,output,session) {
         if (length(missing_cols) > 0) {
           div(
             style = "color: #d9534f; margin-top: 10px;",
-            paste("Warning: variable(s) not found in uploaded data →",
+            paste("Use column names from the uploaded file. Not found:",
                   paste(missing_cols, collapse = ", "))
           )
         } else {
@@ -1029,8 +1420,8 @@ server<-function(input,output,session) {
             style='flex:1;',
             selectInput(
               inputId = 'interaction_option',
-              label = 'Model with interaction between factors?',
-              choices = c('Yes','No'),
+              label = 'Include interaction effects?',
+              choices = c('Include selected interactions' = 'Yes', 'Main effects only' = 'No'),
               selected = 'No',
               width = "100%")
           )
@@ -1059,8 +1450,8 @@ server<-function(input,output,session) {
           style='flex:1;',
           selectInput(
             inputId = 'interaction_option',
-            label = 'Model with interaction between factors?',
-            choices = c('Yes','No'),
+            label = 'Include interaction effects?',
+            choices = c('Include selected interactions' = 'Yes', 'Main effects only' = 'No'),
             selected = 'No',
             width = "100%")
         )
@@ -1090,11 +1481,11 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectizeInput(
                 inputId = "interaction_formula",
-                label = "Interaction Option",
+                label = "Interactions to include",
                 choices = all_combinations,
                 multiple = TRUE,
                 selected = NULL,
-                options = list(placeholder = 'Select one or more combinations'),
+                options = list(placeholder = 'Choose one or more factor combinations'),
                 width = "100%"
               )
             )
@@ -1135,11 +1526,11 @@ server<-function(input,output,session) {
             style='flex:1;',
             selectizeInput(
               inputId = "interaction_formula",
-              label = "Interaction Option",
+              label = "Interactions to include",
               choices = all_combinations,
               multiple = TRUE,
               selected = NULL,
-              options = list(placeholder = 'Select one or more combinations'),
+              options = list(placeholder = 'Choose one or more factor combinations'),
               width = "100%"
             )
           )
@@ -1223,44 +1614,36 @@ server<-function(input,output,session) {
       note_text <- 
         if(input$design_title=='Completely Randomized Design'){
           paste0(
-            'Formula: ~ ', fac_formula,' + e', '<br>',
-            'Error variance: &sigma;<sup>2</sup> (e)'
+            '<strong>Generated model</strong>',
+            'Fixed effects: ~ ', fac_formula, '<br>',
+            'Variance component: residual error (&sigma;<sup>2</sup><sub>e</sub>)'
           )
         } else if(input$design_title=='Randomized Complete Block Design'){
           paste0(
-            'Formula: ~ ', fac_formula,' + e', '<br>',
-            'Block variance: &sigma;<sup>2</sup> (block)','<br>',
-            'Error variance: &sigma;<sup>2</sup> (e)'
+            '<strong>Generated model</strong>',
+            'Fixed and random effects: ~ ', fac_formula, '<br>',
+            'Variance components: block and residual error'
           )
         } else if(input$design_title=='Latin Square Design'){
           paste0(
-            'Formula: ~ ', fac_formula,' + e', '<br>',
-            'Row variance: &sigma;<sup>2</sup> (row)','<br>',
-            'Col variance: &sigma;<sup>2</sup> (col)','<br>',
-            'Error variance: &sigma;<sup>2</sup> (e)'
+            '<strong>Generated model</strong>',
+            'Fixed and random effects: ~ ', fac_formula, '<br>',
+            'Variance components: row, column, and residual error'
           )
         } else if(input$design_title=='Split Plot Design'){
           paste0(
-            'Formula: ~ ', fac_formula,' + e', '<br>',
-            'Mainplot variance: &sigma;<sup>2</sup> (mainplot)','<br>',
-            'Error variance: &sigma;<sup>2</sup> (e)'
+            '<strong>Generated model</strong>',
+            'Fixed and random effects: ~ ', fac_formula, ' + (1 | mainplot)', '<br>',
+            'Variance components: whole plot and residual error'
           )
         } 
-      bslib::card(
-        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-             border-radius: 8px; padding: 6px; margin-top: 4px;",
+      div(
+        class = "model-preview",
         div(
           style = "display: flex; align-items: center; gap: 8px;",
-          
-          # 左侧黑色竖条
-          div(
-            style = "width: 4px; align-self: stretch; background-color: #000; border-radius: 2px;"
-          ),
-          
-          # note_text 内容
           div(
             HTML(paste0(
-              '<p style="font-size: 16px; color: #333; margin: 0;">',
+              '<p style="margin: 0;">',
               note_text,
               '</p>'
             )),
@@ -1278,7 +1661,7 @@ server<-function(input,output,session) {
     if (input$interaction_option == "Yes") {
       if (is.null(input$interaction_formula) || length(input$interaction_formula) == 0) {
         tags$p(
-          "Please select at least one interaction option.",
+          "Choose at least one interaction, or return to main effects only.",
           style = "color: red; font-weight: 500; margin-top: 10px;margin_bottom:10px;"
         )
       }
@@ -1343,6 +1726,7 @@ server<-function(input,output,session) {
   })
   
   observeEvent({list(
+    design_revision(),
     tryCatch(levels_vec(), error = function(e) NULL),
     tryCatch(levels_vec_main(), error = function(e) NULL),
     tryCatch(levels_vec_sub(), error = function(e) NULL),
@@ -1366,7 +1750,7 @@ server<-function(input,output,session) {
     }
     
     if(input$design_title=="Completely Randomized Design"){
-      req(input$num_trt)
+      req(input$num_trt, input$num_rep)
       if(min(levels_vec())==1){
         values$data<-NULL
         values$variance<-NULL
@@ -1417,7 +1801,7 @@ server<-function(input,output,session) {
         values$variance<-as.matrix(df2)
       }
     }else if(input$design_title=="Randomized Complete Block Design"){
-      req(input$num_trt)
+      req(input$num_trt, input$num_block)
       if(min(levels_vec())==1){
         values$data<-NULL
         values$variance<-NULL
@@ -1468,7 +1852,7 @@ server<-function(input,output,session) {
         values$variance<-as.matrix(df2)
       }
     }else if(input$design_title=="Latin Square Design"){
-      req(input$num_trt)
+      req(input$num_trt, input$num_squares, input$value_reuse)
       if(min(levels_vec())==1){
         values$data<-NULL
         values$variance<-NULL
@@ -1524,6 +1908,7 @@ server<-function(input,output,session) {
     }else if(input$design_title=="Split Plot Design"){
       req(input$num_trt_main)
       req(input$num_trt_sub)
+      req(input$num_rep)
       if(min(levels_vec_main())==1||min(levels_vec_sub())==1){
         values$data<-NULL
         values$variance<-NULL
@@ -1662,12 +2047,12 @@ server<-function(input,output,session) {
         note_text <- if (factor_count>=2) {
           req(input$interaction_option)
           if(input$interaction_option=='Yes'){
-            "Please provide cell means of all combinations."
+            "Enter an expected mean response for every treatment combination."
           } else if (input$interaction_option == "No") {
-            "Please provide marginal means of each factor."
+            "Enter the expected marginal mean at each level of every factor."
           } 
         } else if(factor_count<=1) {
-          "Please provide marginal means of each factor."
+          "Enter the expected mean response for each treatment level."
         }
         
       }else if(input$design_title=='Split Plot Design'){
@@ -1677,9 +2062,9 @@ server<-function(input,output,session) {
         req(input$interaction_option)
         
         note_text <- if(input$interaction_option=='Yes'){
-          "Please provide cell means of all combinations."
+          "Enter an expected mean response for every whole-plot and subplot treatment combination."
         } else if (input$interaction_option == "No") {
-          "Please provide marginal means of each factor."
+          "Enter the expected marginal mean at each level of every factor."
         } 
       }else if(input$design_title=='General Design'){
         req(datavalues$uploaded_data)
@@ -1691,8 +2076,8 @@ server<-function(input,output,session) {
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                 border-radius: 8px; padding: 10px; margin-top: 8px;
                 height: 300px; overflow-y: auto;",
-          tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
-          tags$p(note_text, style = "font-size: 15px; color: #333; margin: 0;"),
+          section_header("table", "Expected responses", "Use values on the same scale as the outcome you plan to analyze."),
+          tags$p(note_text, class = "field-note"),
           uiOutput('design_table_ui')
         )
       }else if(input$design_title=='General Design'){
@@ -1700,8 +2085,8 @@ server<-function(input,output,session) {
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                 border-radius: 8px; padding: 10px; margin-top: 8px;
                 height: 300px; overflow-y: auto;",
-          tags$p("Means",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
-          tags$p("Please provide means.", style = "font-size: 15px; color: #333; margin: 0;"),
+          section_header("table", "Expected responses", "Enter the expected response for every model row generated from the uploaded design."),
+          tags$p("Use estimates from prior studies, pilot data, or the smallest effects that would be scientifically meaningful.", class = "field-note"),
           uiOutput('design_table_ui')
         )
       }
@@ -1724,7 +2109,7 @@ server<-function(input,output,session) {
           div(
             style = "height: 180px; border: 1px solid #ddd; background-color: #f9f9f9; 
                  display: flex; align-items: center; justify-content: center;",
-            tags$em("No data available")
+            tags$em("Complete the treatment and model settings above to create the expected-response table.")
           )
         )
       }else{
@@ -1800,7 +2185,7 @@ server<-function(input,output,session) {
         style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                   border-radius: 8px; padding: 10px; margin-top: 8px;
                   height: 240px; display: flex; flex-direction: column;",
-        tags$p("Variance",style='font-weight: bold;font-size:20px;color: #333; margin: 0;'),
+        section_header("wave-square", "Variation assumptions", "Enter variance estimates for each random effect and for residual error. Variances must be zero or greater."),
         div(
           style = "flex: 0 0 auto; overflow-y: auto;",
           uiOutput('design_variance_table_ui')
@@ -1825,13 +2210,16 @@ server<-function(input,output,session) {
           div(
             style = "height: 100px; border: 1px solid #ddd; background-color: #f9f9f9; 
                  display: flex; align-items: center; justify-content: center;",
-            tags$em("No data available")
+            tags$em("Complete the treatment and model settings above to create the variance table.")
           )
         )
       }else{
         if(input$design_title!="General Design"){
           rhandsontable::rHandsontableOutput("design_variance_table")
         }else if(input$design_title=="General Design"){
+          if (!is.list(values$variance)) {
+            return(tags$em("Complete the uploaded-data model settings to create the variance tables."))
+          }
           variance_list <- values$variance
           
           tables_ui <- lapply(seq_along(variance_list), function(i) {
@@ -1884,6 +2272,7 @@ server<-function(input,output,session) {
     req(page_started())
     req(input$design_title == "General Design")
     req(!is.null(values$variance))
+    req(is.list(values$variance))
     
     variance_list <- values$variance
     
@@ -1965,14 +2354,14 @@ server<-function(input,output,session) {
       selectInput(id, lbl, choices = ch, selected = sel, width = "100%")
     }
     
-    group_sel <- var_sel("cor_group", "Grouping variable (optional; for ~ … | group)", extra_none = TRUE)
+    group_sel <- var_sel("cor_group", "Group observations by (optional)", extra_none = TRUE)
     
-    rho_slider <- sliderInput("cor_rho", "Correlation parameter (\u03c1)",
+    rho_slider <- sliderInput("cor_rho", "Adjacent-observation correlation (\u03c1)",
                               min = -0.99, max = 0.99, value = 0.3, step = 0.01, width = "100%")
     
     if (input$cor_type %in% c("corAR1", "corCAR1", "corCompSymm")) {
       return(tagList(
-        var_sel("cor_time", "Time / order variable"),
+        var_sel("cor_time", "Time or sequence column"),
         group_sel,
         rho_slider
       ))
@@ -1980,35 +2369,35 @@ server<-function(input,output,session) {
     
     if (input$cor_type == "corARMA") {
       return(tagList(
-        var_sel("cor_time", "Time / order variable"),
+        var_sel("cor_time", "Time or sequence column"),
         group_sel,
-        numericInput("cor_p", "AR order p", value = 1, min = 0, step = 1, width = "100%"),
-        numericInput("cor_q", "MA order q", value = 0, min = 0, step = 1, width = "100%"),
+        numericInput("cor_p", "Autoregressive order (p)", value = 1, min = 0, step = 1, width = "100%"),
+        numericInput("cor_q", "Moving-average order (q)", value = 0, min = 0, step = 1, width = "100%"),
         uiOutput("cor_arma_params_ui")
       ))
     }
     
     if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
       return(tagList(
-        selectInput("cor_dim", "Spatial coordinates",
+        selectInput("cor_dim", "Number of spatial coordinates",
                     choices = c("1D: ~ x" = "1", "2D: ~ x + y" = "2", "3D: ~ x + y + z" = "3"),
                     selected = "1", width = "100%"),
-        var_sel("cor_x", "Coordinate x"),
-        conditionalPanel("input.cor_dim >= '2'", var_sel("cor_y", "Coordinate y")),
-        conditionalPanel("input.cor_dim == '3'", var_sel("cor_z", "Coordinate z")),
+        var_sel("cor_x", "X-coordinate column"),
+        conditionalPanel("input.cor_dim >= '2'", var_sel("cor_y", "Y-coordinate column")),
+        conditionalPanel("input.cor_dim == '3'", var_sel("cor_z", "Z-coordinate column")),
         group_sel,
-        numericInput("cor_range", "Range parameter", value = 1, min = 1e-6, step = 0.1, width = "100%"),
-        checkboxInput("cor_nugget", "Use nugget effect", value = FALSE)
+        numericInput("cor_range", "Correlation range", value = 1, min = 1e-6, step = 0.1, width = "100%"),
+        checkboxInput("cor_nugget", "Include a nugget effect", value = FALSE)
       ))
     }
     
     if (input$cor_type == "corSymm") {
       return(tagList(
-        var_sel("cor_time", "Index variable (defines correlation levels)"),
+        var_sel("cor_time", "Index column defining repeated levels"),
         group_sel,
         tags$div(
           style = "margin-top:6px; font-size:13px; color:#555;",
-          "Enter lower-triangle correlations in the table below (values strictly between -1 and 1, exclusive)."
+          "Enter the pairwise correlations below the diagonal. Every value must be greater than -1 and less than 1."
         ),
         uiOutput("cor_symm_table_ui")
       ))
@@ -2026,12 +2415,12 @@ server<-function(input,output,session) {
     q <- as.integer(input$cor_q)
     
     if (is.na(p) || is.na(q) || p < 0 || q < 0)
-      return(tags$div(style = "color:#d9534f;", "p and q must be non-negative integers."))
+      return(tags$div(style = "color:#d9534f;", "Enter whole numbers of zero or greater for both p and q."))
     
     k <- p + q
     if (k == 0)
       return(tags$div(style = "margin-top:6px; color:#555;",
-                      "p = 0 and q = 0: no ARMA parameters required."))
+                      "Set p or q above zero to define an ARMA correlation structure."))
     
     inputs <- lapply(seq_len(k), function(i) {
       lab <- if (i <= p) paste0("AR parameter \u03c6", i) else paste0("MA parameter \u03b8", i - p)
@@ -2052,10 +2441,10 @@ server<-function(input,output,session) {
     
     if (m < 2)
       return(tags$div(style = "color:#d9534f; margin-top:6px;",
-                      "Need at least 2 levels in the index variable."))
+                      "Choose an index column with at least two distinct non-missing values."))
     if (m > 15)
       return(tags$div(style = "color:#d9534f; margin-top:6px;",
-                      "Too many levels (> 15) for manual unstructured input. Consider another structure."))
+                      "This column has more than 15 levels, which is too many for manual unstructured correlations. Choose a simpler correlation structure."))
     
     rhandsontable::rHandsontableOutput("cor_symm_table")
   })
@@ -2108,48 +2497,48 @@ server<-function(input,output,session) {
     if (input$cor_type %in% c("corAR1", "corARMA", "corCAR1", "corCompSymm", "corSymm")) {
       t <- tryCatch(input$cor_time, error = function(e) NULL)
       if (is.null(t) || !nzchar(t))
-        msgs <- c(msgs, "Please select a time/index variable.")
+        msgs <- c(msgs, "Choose the column that defines time or observation order.")
       else if (!(t %in% cols))
-        msgs <- c(msgs, paste0("Time/index variable not found in data: ", t))
+        msgs <- c(msgs, paste0("The selected time or sequence column is not in the uploaded data: ", t, "."))
     }
     
     # Spatial coordinate checks
     if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
       x <- tryCatch(input$cor_x, error = function(e) NULL)
       if (is.null(x) || !(x %in% cols))
-        msgs <- c(msgs, "Coordinate x not found in data.")
+        msgs <- c(msgs, "Choose an X-coordinate column from the uploaded data.")
       dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
       if (!is.null(dim_val) && dim_val >= "2") {
         y <- tryCatch(input$cor_y, error = function(e) NULL)
         if (is.null(y) || !(y %in% cols))
-          msgs <- c(msgs, "Coordinate y not found in data.")
+          msgs <- c(msgs, "Choose a Y-coordinate column from the uploaded data.")
       }
       if (!is.null(dim_val) && dim_val == "3") {
         z <- tryCatch(input$cor_z, error = function(e) NULL)
         if (is.null(z) || !(z %in% cols))
-          msgs <- c(msgs, "Coordinate z not found in data.")
+          msgs <- c(msgs, "Choose a Z-coordinate column from the uploaded data.")
       }
     }
     
     # Grouping variable (optional)
     grp <- tryCatch(input$cor_group, error = function(e) NULL)
     if (!is.null(grp) && nzchar(grp) && !(grp %in% cols))
-      msgs <- c(msgs, paste0("Grouping variable not found in data: ", grp))
+      msgs <- c(msgs, paste0("The selected grouping column is not in the uploaded data: ", grp, "."))
     
     # ARMA: p+q check
     if (input$cor_type == "corARMA") {
       p <- tryCatch(as.integer(input$cor_p), error = function(e) NA_integer_)
       q <- tryCatch(as.integer(input$cor_q), error = function(e) NA_integer_)
       if (is.na(p) || is.na(q) || p < 0 || q < 0)
-        msgs <- c(msgs, "p and q must be non-negative integers.")
+        msgs <- c(msgs, "Enter whole numbers of zero or greater for p and q.")
       else if (p == 0 && q == 0)
-        msgs <- c(msgs, "At least one of p or q must be > 0 for corARMA.")
+        msgs <- c(msgs, "Set at least one ARMA order (p or q) above zero.")
     }
     
     if (length(msgs) > 0)
       div(style = "color:#d9534f; margin-top:4px; font-size:13px;", paste(msgs, collapse = "  "))
     else
-      div(style = "color:#28a745; margin-top:4px; font-size:13px;", "\u2713 Correlation settings look valid.")
+      div(style = "color:#28a745; margin-top:4px; font-size:13px;", "\u2713 Correlation settings are complete.")
   })
   
   # ── Build correlation object from safe whitelist ────────────────────────────
@@ -2211,12 +2600,13 @@ server<-function(input,output,session) {
             style='flex:1;',
             selectInput(
               inputId = "Type_ss",
-              label = "Type of sum of square",
-              choices = c('Type I','Type II','Type III'),
+              label = "Sum-of-squares method",
+              choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
               selected = "Type III",
               width = '100%'),
-            sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-            actionButton('create_result','Power Calculation',
+            sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
+            field_note("Type III and \u03b1 = 0.05 are common defaults. Change them only when your analysis plan specifies another choice."),
+            actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                          class = "btn-primary",
                          style = "width: 100%;",width = "100%")
           )
@@ -2248,8 +2638,8 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "which_para",
-                  label = "The factor of interest",
-                  choices = generate_factor_combinations(num_trt),
+                  label = "Effect to compare",
+                  choices = friendly_term_choices(generate_factor_combinations(num_trt)),
                   selected = selected_which,
                   width = "100%")
               )
@@ -2263,7 +2653,7 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "by_para",
-                  label='The variable to condition on',
+                  label='Show comparisons within (optional)',
                   choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
                   selected = selected_by,
                   width = "100%")
@@ -2277,8 +2667,8 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Contrast",
-                label = "Contrast Method",
-                choices = contrast_choices,
+                label = "Comparison method",
+                choices = friendly_contrast_choices(contrast_choices),
                 width = "100%",
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
@@ -2292,8 +2682,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;',
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2307,13 +2697,13 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
-              actionButton('create_result','Power Calculation',
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2346,8 +2736,8 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "which_para",
-                  label = "The factor of interest",
-                  choices = generate_spd_factors(num_trt_main,num_trt_sub),
+                  label = "Effect to compare",
+                  choices = friendly_term_choices(generate_spd_factors(num_trt_main,num_trt_sub)),
                   selected = selected_which,
                   width = "100%")
               )
@@ -2362,7 +2752,7 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "by_para",
-                  label='The variable to condition on',
+                  label='Show comparisons within (optional)',
                   choices = filter_combinations(generate_spd_factors(num_trt_main,num_trt_sub),input$which_para),
                   selected = selected_by,
                   width = "100%")
@@ -2376,8 +2766,8 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Contrast",
-                label = "Contrast Method",
-                choices = contrast_choices,
+                label = "Comparison method",
+                choices = friendly_contrast_choices(contrast_choices),
                 width = "100%",
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
@@ -2391,8 +2781,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;',
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2406,13 +2796,13 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F),
-              actionButton('create_result','Power Calculation',
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2425,8 +2815,8 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
                 style='flex:1;',
-                textInput("which_para", "The factor of interest",
-                          placeholder = "e.g., fA or fA:fB",width = "100%")
+                textInput("which_para", "Effect to compare",
+                          placeholder = "For example: treatment or treatment:time",width = "100%")
               )
           ),
           tags$script(HTML('$(document).ready(function(){$("[data-toggle=\'tooltip\']").tooltip();});')),
@@ -2435,9 +2825,9 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
                 style='flex:1;',
-                textInput("by_para", "The variable to condition on",
+                textInput("by_para", "Show comparisons within (optional)",
                           value = "",
-                          placeholder = "e.g., fB",width = "100%")
+                          placeholder = "For example: time",width = "100%")
               )
           ),
           tags$script(HTML('$(document).ready(function(){$("[data-toggle=\'tooltip\']").tooltip();});')),
@@ -2451,8 +2841,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;',
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2466,12 +2856,12 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",width = "100%"),
-              sliderInput("p_value2",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
-              actionButton('create_result','Power Calculation',
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2502,11 +2892,11 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Type_ss",
-                label = "Type of sum of square",
-                choices = c('Type I','Type II','Type III'),
+                label = "Sum-of-squares method",
+                choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           if(num_trt>1){
@@ -2517,8 +2907,8 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "which_para",
-                  label = "The factor of interest",
-                  choices = generate_factor_combinations(num_trt),
+                  label = "Effect to compare",
+                  choices = friendly_term_choices(generate_factor_combinations(num_trt)),
                   selected = selected_which,width = "100%")
               )
             )
@@ -2531,7 +2921,7 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "by_para",
-                  label='The variable to condition on',
+                  label='Show comparisons within (optional)',
                   choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
                   selected = selected_by,width = "100%")
               )
@@ -2544,8 +2934,8 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Contrast",
-                label = "Contrast Method",
-                choices = contrast_choices,
+                label = "Comparison method",
+                choices = friendly_contrast_choices(contrast_choices),
                 width = "100%",
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
@@ -2558,8 +2948,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;',
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2574,12 +2964,12 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
-              actionButton('create_result','Power Calculation',
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2610,11 +3000,11 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Type_ss",
-                label = "Type of sum of square",
-                choices = c('Type I','Type II','Type III'),
+                label = "Sum-of-squares method",
+                choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           
@@ -2626,8 +3016,8 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "which_para",
-                  label = "The factor of interest",
-                  choices = generate_spd_factors(num_trt_main,num_trt_sub),
+                  label = "Effect to compare",
+                  choices = friendly_term_choices(generate_spd_factors(num_trt_main,num_trt_sub)),
                   selected = selected_which,
                   width = "100%")
               )
@@ -2642,7 +3032,7 @@ server<-function(input,output,session) {
                 style='flex:1;',
                 selectInput(
                   inputId = "by_para",
-                  label='The variable to condition on',
+                  label='Show comparisons within (optional)',
                   choices = filter_combinations(generate_spd_factors(num_trt_main,num_trt_sub),input$which_para),
                   selected = selected_by,
                   width = "100%")
@@ -2656,8 +3046,8 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Contrast",
-                label = "Contrast Method",
-                choices = contrast_choices,
+                label = "Comparison method",
+                choices = friendly_contrast_choices(contrast_choices),
                 width = "100%",
                 selected = if (is.null(input$Contrast)) "pairwise" else {
                   if(input$Contrast %in% contrast_choices) input$Contrast else "pairwise"
@@ -2671,8 +3061,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;', 
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2686,12 +3076,12 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
-              actionButton('create_result','Power Calculation',
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2706,19 +3096,19 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "Type_ss",
-                label = "Type of sum of square",
-                choices = c('Type I','Type II','Type III'),
+                label = "Sum-of-squares method",
+                choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
                 selected = "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
           
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
                 style='flex:1;',
-                textInput("which_para", "The factor of interest",
-                          placeholder = "e.g., fA or fA:fB",width = "100%")
+                textInput("which_para", "Effect to compare",
+                          placeholder = "For example: treatment or treatment:time",width = "100%")
               )
           ),
           tags$script(HTML('$(document).ready(function(){$("[data-toggle=\'tooltip\']").tooltip();});')),
@@ -2727,9 +3117,9 @@ server<-function(input,output,session) {
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
                 style='flex:1;',
-                textInput("by_para", "The variable to condition on",
+                textInput("by_para", "Show comparisons within (optional)",
                           value = "",
-                          placeholder = "e.g., fB",width = "100%")
+                          placeholder = "For example: time",width = "100%")
               )
           ),
           tags$script(HTML('$(document).ready(function(){$("[data-toggle=\'tooltip\']").tooltip();});')),
@@ -2743,8 +3133,8 @@ server<-function(input,output,session) {
                   div(
                     style='flex:1;',
                     textInput("custom_contrast", 
-                              "Contrast vector",
-                              placeholder = "e.g., 1,-1",
+                              "Contrast coefficients",
+                              placeholder = "For example: 1, -1",
                               width = "100%")
                   )
               ),
@@ -2758,12 +3148,12 @@ server<-function(input,output,session) {
               style='flex:1;',
               selectInput(
                 inputId = "alternative",
-                label = "Alternative",
-                choices = c('one.sided','two.sided'),
+                label = "Alternative hypothesis",
+                choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
                 selected = "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", HTML("P-value adjustment ( Bonferroni <i>t</i> )"), value = F,width = "100%"),
-              actionButton('create_result','Power Calculation',
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
@@ -2789,11 +3179,11 @@ server<-function(input,output,session) {
     
     msgs <- c()
     if (length(missing_cols) > 0) {
-      msgs <- c(msgs, paste0("Variable(s) not found in uploaded data → ", 
+      msgs <- c(msgs, paste0("Use column names from the uploaded data. Not found: ",
                              paste(missing_cols, collapse = ", ")))
     }
     if (length(duplicated_factors) > 0) {
-      msgs <- c(msgs, paste0("Variable(s) already used in 'The factor of interest' → ",
+      msgs <- c(msgs, paste0("Remove columns already included in the effect to compare: ",
                              paste(duplicated_factors, collapse = ", ")))
     }
     
@@ -2827,8 +3217,8 @@ server<-function(input,output,session) {
         style='flex:1;',
         selectInput(
           inputId = "Contrast",
-          label = "Contrast Method",
-          choices = contrast_choices(),
+          label = "Comparison method",
+          choices = friendly_contrast_choices(contrast_choices()),
           width = "100%",
           selected = if (is.null(input$Contrast)) {
             "pairwise"
@@ -2854,12 +3244,12 @@ server<-function(input,output,session) {
     
     if (is.null(vec) || any(is.na(vec))) {
       return(tags$div(style = "color: red;", 
-                      "Invalid input. Please enter comma-separated numbers only."))
+                      "Enter only numeric coefficients separated by commas, such as 1, -1."))
     }
     
     if (sum(vec) != 0) {
       return(tags$div(style = "color: red;", 
-                      paste0("The sum of all contrast coefficients must equal 0. (Current sum = ", sum(vec), ")")))
+                      paste0("Contrast coefficients must sum to 0. The current sum is ", sum(vec), ".")))
     }
     
     level_nums <- tryCatch({
@@ -2868,7 +3258,7 @@ server<-function(input,output,session) {
     
     if (is.null(level_nums) || any(is.na(level_nums))) {
       return(tags$div(style = "color: red;", 
-                      "Invalid 'level_numbers' input. Please enter numeric levels separated by commas."))
+                      "Set valid treatment levels before entering custom contrast coefficients."))
     }
     
     expected_length <- NA 
@@ -2920,13 +3310,13 @@ server<-function(input,output,session) {
     
     if (length(vec) != expected_length) {
       return(tags$div(style = "color: red;", 
-                      paste0("The number of coefficients (", length(vec),
-                             ") does not match the expected number (", expected_length, 
-                             ") for factor '", input$which_para, "'.")
+                      paste0("Enter ", expected_length, " coefficients for ",
+                             friendly_term_choices(input$which_para) |> names(),
+                             "; ", length(vec), " were provided.")
       ))
     }
     
-    tags$div(style = "color: green;", "Contrast vector input is valid.")
+    tags$div(style = "color: green;", "\u2713 Contrast coefficients are valid.")
   })
   
   output$contrast_validation2 <- renderUI({
@@ -2943,12 +3333,12 @@ server<-function(input,output,session) {
     
     if (is.null(vec) || any(is.na(vec))) {
       return(tags$div(style = "color: red;", 
-                      "Invalid input. Please enter comma-separated numbers only."))
+                      "Enter only numeric coefficients separated by commas, such as 1, -1."))
     }
     
     if (sum(vec) != 0) {
       return(tags$div(style = "color: red;", 
-                      paste0("The sum of all contrast coefficients must equal 0. (Current sum = ", sum(vec), ")")))
+                      paste0("Contrast coefficients must sum to 0. The current sum is ", sum(vec), ".")))
     }
     
     factors <- unlist(strsplit(input$which_para, "\\:"))
@@ -2957,7 +3347,7 @@ server<-function(input,output,session) {
     missing_cols <- setdiff(factors, colnames(df))
     if (length(missing_cols) > 0) {
       return(tags$div(style = "color: red;", 
-                      paste("Variable(s) not found in uploaded data →", 
+                      paste("Use column names from the uploaded data. Not found:",
                             paste(missing_cols, collapse = ", "))))
     }
     
@@ -2966,13 +3356,12 @@ server<-function(input,output,session) {
     
     if (length(vec) != expected_length) {
       return(tags$div(style = "color: red;", 
-                      paste0("The number of coefficients (", length(vec),
-                             ") does not match the expected number (", expected_length, 
-                             ") for factor '", input$which_para, "'.")
+                      paste0("Enter ", expected_length, " coefficients for ", input$which_para,
+                             "; ", length(vec), " were provided.")
       ))
     }
     
-    tags$div(style = "color: green;", "Contrast vector input is valid.")
+    tags$div(style = "color: green;", "\u2713 Contrast coefficients are valid.")
   })
   
   observeEvent(input$which_para, {
@@ -3006,7 +3395,7 @@ server<-function(input,output,session) {
     }
     
     return(div(style = "color: #28a745; margin-top: 4px;",
-               "Validation complete: all variables exist in the input data."))
+               "\u2713 Model formula is valid and all variables were found in the uploaded data."))
   })
 
   active_factor_count_error <- function() {
@@ -3042,32 +3431,42 @@ server<-function(input,output,session) {
     tryCatch({
       output$results_display <- renderUI({
         req(input$Type)
-        table_style <- "display: flex; justify-content: center; align-items: center; 
-                  padding: 20px; margin: 15px auto; width: 90%; 
-                  background-color: #f9f9f9; border-radius: 10px; 
-                  box-shadow: 0 2px 6px rgba(0,0,0,0.1);"
-        
         if (input$Type == "F-test") {
           return(
-            div(style = "display: flex; justify-content: center;",
-                div(style = table_style,
-                    tableOutput("power_omnibus_test"))
+            tagList(
+              result_table_block(
+                "Overall-effect power",
+                "Each row estimates power for the omnibus F-test of one model effect.",
+                tableOutput("power_omnibus_test")
+              ),
+              interpretation_guide()
             )
           )
         } else if (input$Type == "t-test") {
           return(
-            div(style = "display: flex; justify-content: center;",
-                div(style = table_style,
-                    tableOutput("power_contrast"))
+            tagList(
+              result_table_block(
+                "Comparison-specific power",
+                "Each row estimates power for one selected contrast or pairwise comparison.",
+                tableOutput("power_contrast")
+              ),
+              interpretation_guide()
             )
           )
         } else if (input$Type == "F-test & t-test") {
           return(
-            div(style = "display: flex; flex-direction: column; align-items: center;",
-                div(style = table_style,
-                    tableOutput("power_omnibus_test")),
-                div(style = table_style,
-                    tableOutput("power_contrast"))
+            tagList(
+              result_table_block(
+                "Overall-effect power",
+                "Omnibus F-tests answer whether an effect is detectable somewhere across its levels.",
+                tableOutput("power_omnibus_test")
+              ),
+              result_table_block(
+                "Comparison-specific power",
+                "Contrasts answer whether the selected treatment differences are detectable.",
+                tableOutput("power_contrast")
+              ),
+              interpretation_guide()
             )
           )
         }
@@ -3082,7 +3481,7 @@ server<-function(input,output,session) {
         values_variance<-as.numeric(unlist(values_variance))
         
         if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+          showNotification("Complete every highlighted cell in the expected-response and variation tables, then run the analysis again.",
                            type = "error", duration = 5)
           return(NULL)
         }else{
@@ -3132,7 +3531,7 @@ server<-function(input,output,session) {
         values_sigma2<-as.numeric(values_variance[2])
         
         if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+          showNotification("Complete every highlighted cell in the expected-response and variation tables, then run the analysis again.",
                            type = "error", duration = 5)
           return(NULL)
         }else{
@@ -3186,7 +3585,7 @@ server<-function(input,output,session) {
         values_sigma2<-as.numeric(values_variance[3])
         
         if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+          showNotification("Complete every highlighted cell in the expected-response and variation tables, then run the analysis again.",
                            type = "error", duration = 5)
           return(NULL)
         }else{
@@ -3242,7 +3641,7 @@ server<-function(input,output,session) {
         values_sigma2<-as.numeric(values_variance[2])
         
         if (any(is.na(values_mean)) || any(is.na(values_variance))) {
-          showNotification("Please fill in all cells in both mean and variance tables before calculating results.",
+          showNotification("Complete every highlighted cell in the expected-response and variation tables, then run the analysis again.",
                            type = "error", duration = 5)
           return(NULL)
         }else{
@@ -3699,7 +4098,7 @@ server<-function(input,output,session) {
       results_generated(TRUE)
     }, error = function(e) {
       showNotification(
-        paste("An error occurred:", e$message),
+        paste("Power could not be calculated. Review the design assumptions and test settings.", e$message),
         type = "error",
         duration = 8
       )
@@ -3741,14 +4140,7 @@ server<-function(input,output,session) {
     stale_results <- results_generated()
     if (stale_results) results_generated(FALSE)
     output$results_display <- renderUI({
-      div(
-        style = "text-align:center; padding: 40px; color: #777;",
-        if (stale_results) {
-          "Inputs changed. Click 'Power Calculation' to refresh the results."
-        } else {
-          "Please click 'Power Calculation' to generate results."
-        }
-      )
+      result_empty_state(stale_results)
     })
   })
   

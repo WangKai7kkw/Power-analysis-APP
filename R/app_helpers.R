@@ -8,7 +8,7 @@ value_or_default <- function(value, default) {
 
 validate_factor_count <- function(n, max_factors = MAX_TREATMENT_FACTORS) {
   message <- sprintf(
-    "The number of treatment factors must be an integer between 1 and %d.",
+    "Choose a whole number of treatment factors; it must be an integer between 1 and %d.",
     max_factors
   )
   if (length(n) != 1L) {
@@ -59,21 +59,21 @@ generate_factor_combinations_safe <- function(
 
 uploaded_file_extension <- function(upload) {
   if (is.null(upload) || is.null(upload$name) || !nzchar(upload$name)) {
-    stop("No uploaded filename was provided.", call. = FALSE)
+    stop("Choose a study-data file before continuing.", call. = FALSE)
   }
   tolower(tools::file_ext(upload$name))
 }
 
 read_uploaded_data <- function(upload) {
   if (is.null(upload$datapath) || !file.exists(upload$datapath)) {
-    stop("The uploaded temporary file is unavailable.", call. = FALSE)
+    stop("The uploaded file is no longer available. Choose the file again.", call. = FALSE)
   }
 
   extension <- uploaded_file_extension(upload)
   if (!(extension %in% SUPPORTED_UPLOAD_EXTENSIONS)) {
     stop(
       sprintf(
-        "Unsupported file type: .%s. Supported types are: %s.",
+        "Unsupported file type: .%s. Choose one of these supported formats: %s.",
         extension,
         paste(SUPPORTED_UPLOAD_EXTENSIONS, collapse = ", ")
       ),
@@ -92,29 +92,29 @@ read_uploaded_data <- function(upload) {
 
   data <- as.data.frame(data)
   if (nrow(data) == 0L) {
-    stop("The uploaded file is empty.", call. = FALSE)
+    stop("The uploaded file is empty. Add a header row and at least one observation, then upload it again.", call. = FALSE)
   }
   data
 }
 
 parse_custom_contrast <- function(value, expected_length = NULL, tolerance = 1e-10) {
   if (is.null(value) || !nzchar(trimws(value))) {
-    stop("Enter a comma-separated contrast vector.", call. = FALSE)
+    stop("Enter contrast coefficients separated by commas, such as 1, -1.", call. = FALSE)
   }
 
   fields <- trimws(strsplit(value, ",", fixed = TRUE)[[1]])
   if (any(!nzchar(fields))) {
-    stop("Contrast coefficients cannot be empty.", call. = FALSE)
+    stop("Every contrast coefficient needs a value; remove extra commas or fill the empty coefficient.", call. = FALSE)
   }
 
   coefficients <- suppressWarnings(as.numeric(fields))
   if (anyNA(coefficients) || any(!is.finite(coefficients))) {
-    stop("Contrast coefficients must all be finite numbers.", call. = FALSE)
+    stop("Contrast coefficients must all be finite numbers separated by commas.", call. = FALSE)
   }
   if (!is.null(expected_length) && length(coefficients) != expected_length) {
     stop(
       sprintf(
-        "The contrast has %d coefficients; %d are required.",
+        "The contrast has %d coefficients; %d are required for the selected effect.",
         length(coefficients),
         expected_length
       ),
@@ -122,17 +122,17 @@ parse_custom_contrast <- function(value, expected_length = NULL, tolerance = 1e-
     )
   }
   if (abs(sum(coefficients)) > tolerance) {
-    stop("Contrast coefficients must sum to zero.", call. = FALSE)
+    stop("Contrast coefficients must sum to zero. Adjust the values and try again.", call. = FALSE)
   }
   coefficients
 }
 
 validate_model_formula <- function(value, data) {
   if (is.null(value) || !nzchar(trimws(value))) {
-    stop("Enter a model formula.", call. = FALSE)
+    stop("Enter a model formula using columns from the uploaded data.", call. = FALSE)
   }
   if (!grepl("^\\s*~", value)) {
-    stop("The formula must start with '~'.", call. = FALSE)
+    stop("The model formula must start with '~', for example ~ treatment + (1 | block).", call. = FALSE)
   }
 
   formula <- tryCatch(
@@ -145,7 +145,7 @@ validate_model_formula <- function(value, data) {
   if (length(missing_variables)) {
     stop(
       sprintf(
-        "Variables not found in the uploaded data: %s.",
+        "These variables were not found in the uploaded data: %s. Check spelling and capitalization.",
         paste(missing_variables, collapse = ", ")
       ),
       call. = FALSE
@@ -182,11 +182,11 @@ calculate_power_results <- function(
   test_type <- match.arg(test_type)
   type_ss <- as.integer(type_ss)
   if (!(type_ss %in% 1:3)) {
-    stop("The sum-of-squares type must be 1, 2, or 3.", call. = FALSE)
+    stop("Choose Type I, II, or III for the sum-of-squares method.", call. = FALSE)
   }
   for (level in c(sig_level_f, sig_level_t)) {
     if (length(level) != 1L || !is.finite(level) || level <= 0 || level >= 1) {
-      stop("Significance levels must be strictly between 0 and 1.", call. = FALSE)
+      stop("Set each significance threshold to a value greater than 0 and less than 1.", call. = FALSE)
     }
   }
 
@@ -201,7 +201,7 @@ calculate_power_results <- function(
 
   if (test_type %in% c("t-test", "F-test & t-test")) {
     if (is.null(which) || !nzchar(which)) {
-      stop("A factor of interest is required for contrast power.", call. = FALSE)
+      stop("Choose an effect to compare before calculating comparison-specific power.", call. = FALSE)
     }
     if (is.numeric(contrast)) {
       contrast <- list(`Contrast vector` = contrast)
