@@ -21,6 +21,55 @@ test_that("treatment label specifications validate clearly", {
   expect_match(validate_treatment_label_spec(duplicate_factors), "unique name")
 })
 
+test_that("grouped level names grow predictably and customized names survive shrinkage", {
+  expect_equal(
+    reconcile_treatment_level_names(NULL, "facA", 2),
+    c("facA1", "facA2")
+  )
+  expect_length(reconcile_treatment_level_names("", "facA", 2), 0)
+  expect_equal(
+    reconcile_treatment_level_names("Control, Supplement", "facA", 3),
+    c("Control", "Supplement", "facA3")
+  )
+  expect_equal(
+    reconcile_treatment_level_names("Control, Supplement, High dose", "facA", 2),
+    c("Control", "Supplement", "High dose")
+  )
+  expect_equal(
+    reconcile_treatment_level_names("facA1, facA2, facA3", "facA", 2),
+    c("facA1", "facA2")
+  )
+})
+
+test_that("grouped factor validation reports field-specific problems", {
+  spec <- list(
+    build_treatment_factor_spec("facA", "Diet", "Control, Control", 2),
+    build_treatment_factor_spec("facB", "diet", "Week 1, Week 2, Week 3", 2)
+  )
+  expect_true(any(grepl(
+    "Factor names must be unique",
+    treatment_factor_validation_messages(spec[[1]], spec),
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "Level names must be unique",
+    treatment_factor_validation_messages(spec[[1]], spec),
+    fixed = TRUE
+  )))
+  expect_true(any(grepl(
+    "extra level name is retained",
+    treatment_factor_validation_messages(spec[[2]], spec),
+    fixed = TRUE
+  )))
+
+  incomplete <- build_treatment_factor_spec("facA", "Diet", "Control, Supplement", 3)
+  expect_match(
+    treatment_factor_validation_messages(incomplete),
+    "Add 1 more level name",
+    fixed = TRUE
+  )
+})
+
 test_that("custom treatment names translate tables and result labels", {
   spec <- list(build_treatment_factor_spec(
     internal = "trt",

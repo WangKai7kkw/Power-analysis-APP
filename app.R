@@ -336,17 +336,25 @@ app_css <- "
     line-height: 1.45;
   }
   .field-note svg, .field-note i { margin-top: 2px; color: var(--primary); }
+  .factor-config-intro { margin-top: 10px; }
+  .factor-config-section + .factor-config-section { margin-top: 16px; }
+  .factor-config-heading { margin: 0 0 8px; color: #263650; font-size: 14px; font-weight: 750; }
   .naming-grid { display: grid; gap: 10px; margin-top: 4px; }
   .naming-row {
     display: grid;
-    grid-template-columns: minmax(130px, .75fr) minmax(190px, 1.25fr);
+    grid-template-columns: minmax(0, .85fr) minmax(110px, .65fr) minmax(0, 1.5fr);
     gap: 10px;
     padding: 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: #fff;
   }
+  .naming-row-title { grid-column: 1 / -1; margin: 0; color: #36506f; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
   .naming-row .form-group { margin-bottom: 0; }
+  .factor-feedback { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 18px; font-size: 12px; }
+  .level-name-count { color: var(--muted); font-weight: 650; }
+  .factor-inline-error { color: var(--danger); }
+  .factor-inline-warning { color: #8a5b00; }
   .validation-success { margin: 7px 0 0; color: var(--success); font-size: 12px; }
   .validation-error { margin: 7px 0 0; color: var(--danger); font-size: 12px; }
   .model-preview {
@@ -469,6 +477,7 @@ app_css <- "
     .workflow-card > .card-header, .panel-body { padding: 15px; }
     .welcome-modal { padding: 26px 22px 22px; }
     .naming-row { grid-template-columns: 1fr; }
+    .naming-row-title, .factor-feedback { grid-column: 1; }
   }
 "
 
@@ -770,9 +779,6 @@ server<-function(input,output,session) {
                                width = '100%')
               )
           ),
-          div(style="margin-bottom: 2px;",
-              uiOutput("level_number_ui")
-          ),
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
@@ -822,9 +828,6 @@ server<-function(input,output,session) {
                                width = "100%")
               )
           ),
-          div(style="margin-bottom: 2px;",
-              uiOutput("level_number_ui")
-          ),
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
@@ -871,9 +874,6 @@ server<-function(input,output,session) {
                                step = 1,
                                width = "100%")
               )
-          ),
-          div(style="margin-bottom: 2px;",
-              uiOutput("level_number_ui")
           ),
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
@@ -938,10 +938,6 @@ server<-function(input,output,session) {
               )
           ),
           
-          div(style="margin-bottom: 2px;",
-              uiOutput("level_numbers_main_ui")
-          ),
-          
           div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
               div(style="flex:1;",
                   numericInput("num_trt_sub", "Subplot factors",
@@ -949,9 +945,6 @@ server<-function(input,output,session) {
                                step = 1,
                                width="100%")
               )
-          ),
-          div(style="margin-bottom: 2px;",
-              uiOutput("level_numbers_sub_ui")
           ),
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
@@ -1074,210 +1067,17 @@ server<-function(input,output,session) {
     }
   })
   
-  output$level_number_ui <- renderUI({
-    req(page_started())
-    req(!is.null(input$num_trt))
-    count_result <- factor_count_result(input$num_trt)
-    if (is.null(count_result$value)) {
-      return(factor_count_warning(count_result$message))
-    }
-    factor_count <- count_result$value
-
-    num_inputs <- lapply(seq_len(factor_count), function(i) {
-      tags$div(
-        style = "display: flex; flex-direction: column; align-items: center;",
-        numericInput(
-          inputId = paste0("factor_", i),
-          label = paste0("Factor ", LETTERS[i]),
-          value = isolate(input[[paste0("factor_", i)]]) %||% 2,
-          min = 2,
-          step = 1,
-          width = "100px"
-        )
-      )
-    })
-    
-    hidden_text_input <- tags$div(
-      style = "display: none;",
-      textInput(
-        inputId = "level_numbers",
-        label = NULL,
-        value = isolate(input$level_numbers) %||% paste(rep(2, factor_count), collapse = ",")
-      )
-    )
-    
-    observeEvent(
-      lapply(seq_len(factor_count), function(i) input[[paste0("factor_", i)]]),
-      {
-        factor_values <- sapply(seq_len(factor_count), function(i) {
-          input[[paste0("factor_", i)]] %||% 2
-        })
-        updateTextInput(
-          session,
-          inputId = "level_numbers",
-          value = paste(factor_values, collapse = ",")
-        )
-      },
-      ignoreNULL = FALSE
-    )
-    
-    tagList(
-      tags$label("Levels per treatment factor",
-                 style = "margin-bottom: 10px; display: block;"),
-      field_note("Enter the number of categories or treatment settings for each factor (minimum 2)."),
-      div(
-        style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
-        num_inputs
-      ),
-      hidden_text_input
-    )
-  })
-  
-  output$level_numbers_main_ui <- renderUI({
-    req(page_started())
-    req(!is.null(input$num_trt_main))
-    count_result <- factor_count_result(input$num_trt_main)
-    if (is.null(count_result$value)) {
-      return(factor_count_warning(count_result$message))
-    }
-    factor_count <- count_result$value
-    
-    num_inputs_main <- lapply(seq_len(factor_count), function(i) {
-      tags$div(
-        style = "display: flex; flex-direction: column; align-items: center;",
-        numericInput(
-          inputId = paste0("factor_main_", i),
-          label = paste0("Factor ", LETTERS[i]),
-          value = isolate(input[[paste0("factor_main_", i)]]) %||% 2,
-          min = 2,
-          step = 1,
-          width = "100px"
-        )
-      )
-    })
-    
-    hidden_text_input_main <- tags$div(
-      style = "display: none;",
-      textInput(
-        inputId = "level_numbers_main",
-        label = NULL,
-        value = isolate(input$level_numbers_main) %||% paste(rep(2, factor_count), collapse = ",")
-      )
-    )
-    
-    observeEvent(
-      lapply(seq_len(factor_count), function(i) input[[paste0("factor_main_", i)]]),
-      {
-        factor_values_main <- sapply(seq_len(factor_count), function(i) {
-          input[[paste0("factor_main_", i)]] %||% 2
-        })
-        updateTextInput(
-          session,
-          inputId = "level_numbers_main",
-          value = paste(factor_values_main, collapse = ",")
-        )
-      },
-      ignoreNULL = FALSE
-    )
-    
-    tagList(
-      tags$label("Levels per whole-plot factor",
-                 style = "margin-bottom: 10px; display: block;"),
-      field_note("Enter the number of settings applied at the whole-plot level."),
-      div(
-        style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
-        num_inputs_main
-      ),
-      hidden_text_input_main
-    )
-  })
-  
-  output$level_numbers_sub_ui <- renderUI({
-    req(page_started())
-    req(!is.null(input$num_trt_sub))
-    count_result <- factor_count_result(input$num_trt_sub)
-    if (is.null(count_result$value)) {
-      return(factor_count_warning(count_result$message))
-    }
-    factor_count <- count_result$value
-    
-    num_inputs_sub <- lapply(seq_len(factor_count), function(i) {
-      tags$div(
-        style = "display: flex; flex-direction: column; align-items: center;",
-        numericInput(
-          inputId = paste0("factor_sub_", i),
-          label = paste0("Factor ", LETTERS[i]),
-          value = isolate(input[[paste0("factor_sub_", i)]]) %||% 2,
-          min = 2,
-          step = 1,
-          width = "100px"
-        )
-      )
-    })
-    
-    hidden_text_input_sub <- tags$div(
-      style = "display: none;",
-      textInput(
-        inputId = "level_numbers_sub",
-        label = NULL,
-        value = isolate(input$level_numbers_sub) %||% paste(rep(2, factor_count), collapse = ",")
-      )
-    )
-    
-    observeEvent(
-      lapply(seq_len(factor_count), function(i) input[[paste0("factor_sub_", i)]]),
-      {
-        factor_values_sub <- sapply(seq_len(factor_count), function(i) {
-          input[[paste0("factor_sub_", i)]] %||% 2
-        })
-        updateTextInput(
-          session,
-          inputId = "level_numbers_sub",
-          value = paste(factor_values_sub, collapse = ",")
-        )
-      },
-      ignoreNULL = FALSE
-    )
-    
-    tagList(
-      tags$label("Levels per subplot factor",
-                 style = "margin-bottom: 10px; display: block;"),
-      field_note("Enter the number of settings applied within each whole plot."),
-      div(
-        style = "font-size: 12px;font-weight: bold;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
-        num_inputs_sub
-      ),
-      hidden_text_input_sub
-    )  
-  })
-
-  reconcile_level_label_value <- function(input_id, defaults) {
-    current <- parse_treatment_labels(isolate(input[[input_id]]))
-    if (length(current) == 0L) return(paste(defaults, collapse = ", "))
-    generated_level_pattern <- "^(trt|fac[A-Z])(\\.(main|sub))?[0-9]+$"
-    if (
-      all(grepl(generated_level_pattern, current)) &&
-        !identical(current, defaults)
-    ) {
-      return(paste(defaults, collapse = ", "))
-    }
-    retained <- head(current, length(defaults))
-    if (length(retained) < length(defaults)) {
-      retained <- c(retained, defaults[seq.int(length(retained) + 1L, length(defaults))])
-    }
-    paste(retained, collapse = ", ")
-  }
-
-  naming_row <- function(prefix, index, internal, level_count, scope_label) {
+  naming_row <- function(prefix, index, internal, level_count, scope_label, count_id) {
     name_id <- paste0(prefix, "_name_", index)
     levels_id <- paste0(prefix, "_levels_", index)
-    defaults <- paste0(internal, seq_len(level_count))
+    feedback_id <- paste0(prefix, "_feedback_", index)
     current_name <- isolate(input[[name_id]])
     generated_factor_pattern <- "^(trt|fac[A-Z])(\\.(main|sub))?$"
     if (
-      is.null(current_name) || !nzchar(trimws(current_name)) ||
+      is.null(current_name) ||
         (
-          grepl(generated_factor_pattern, trimws(current_name)) &&
+          nzchar(trimws(current_name)) &&
+            grepl(generated_factor_pattern, trimws(current_name)) &&
             !identical(trimws(current_name), internal)
         )
     ) {
@@ -1286,69 +1086,148 @@ server<-function(input,output,session) {
 
     div(
       class = "naming-row",
+      tags$h4(class = "naming-row-title", scope_label),
       textInput(
         name_id,
-        paste0(scope_label, " name"),
+        "Factor name",
         value = current_name,
-        placeholder = paste0("For example: ", scope_label)
+        placeholder = "For example: Diet"
+      ),
+      numericInput(
+        count_id,
+        "Number of levels",
+        value = level_count,
+        min = 2,
+        step = 1,
+        width = "100%"
       ),
       textInput(
         levels_id,
         "Level names",
-        value = reconcile_level_label_value(levels_id, defaults),
+        value = paste(
+          reconcile_treatment_level_names(isolate(input[[levels_id]]), internal, level_count),
+          collapse = ", "
+        ),
         placeholder = "For example: Control, Low dose, High dose"
-      )
+      ),
+      uiOutput(feedback_id, class = "factor-feedback")
     )
-  }
-
-  treatment_level_counts <- function(value, factor_count) {
-    counts <- suppressWarnings(as.integer(
-      trimws(strsplit(value %||% "", ",", fixed = TRUE)[[1]])
-    ))
-    counts <- counts[!is.na(counts) & counts >= 2L]
-    if (length(counts) < factor_count) {
-      counts <- c(counts, rep(2L, factor_count - length(counts)))
-    }
-    head(counts, factor_count)
   }
 
   output$treatment_names_ui <- renderUI({
     req(page_started(), input$design_title)
     if (input$design_title == "General Design") return(NULL)
 
-    rows <- if (input$design_title == "Split Plot Design") {
-      req(input$num_trt_main, input$num_trt_sub, input$level_numbers_main, input$level_numbers_sub)
-      main_count <- validate_factor_count(input$num_trt_main)
-      sub_count <- validate_factor_count(input$num_trt_sub)
-      main_levels <- treatment_level_counts(input$level_numbers_main, main_count)
-      sub_levels <- treatment_level_counts(input$level_numbers_sub, sub_count)
+    if (input$design_title == "Split Plot Design") {
+      req(input$num_trt_main, input$num_trt_sub)
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      if (is.null(main_result$value)) return(factor_count_warning(main_result$message))
+      if (is.null(sub_result$value)) return(factor_count_warning(sub_result$message))
+      main_count <- main_result$value
+      sub_count <- sub_result$value
       main_internal <- if (main_count == 1L) "trt.main" else paste0("fac", LETTERS[seq_len(main_count)], ".main")
       sub_internal <- if (sub_count == 1L) "trt.sub" else paste0("fac", LETTERS[seq_len(sub_count)], ".sub")
 
-      c(
-        lapply(seq_len(main_count), function(index) {
-          naming_row("main_factor", index, main_internal[[index]], main_levels[[index]], paste("Whole-plot factor", index))
-        }),
-        lapply(seq_len(sub_count), function(index) {
-          naming_row("sub_factor", index, sub_internal[[index]], sub_levels[[index]], paste("Subplot factor", index))
-        })
-      )
-    } else {
-      req(input$num_trt, input$level_numbers)
-      factor_count <- validate_factor_count(input$num_trt)
-      level_counts <- treatment_level_counts(input$level_numbers, factor_count)
-      internals <- if (factor_count == 1L) "trt" else paste0("fac", LETTERS[seq_len(factor_count)])
-      lapply(seq_len(factor_count), function(index) {
-        naming_row("treatment_factor", index, internals[[index]], level_counts[[index]], paste("Factor", index))
+      main_rows <- lapply(seq_len(main_count), function(index) {
+        count_id <- paste0("factor_main_", index)
+        level_count <- input[[count_id]] %||% 2
+        naming_row(
+          "main_factor", index, main_internal[[index]], level_count,
+          paste("Whole-plot factor", LETTERS[index]), count_id
+        )
       })
+      sub_rows <- lapply(seq_len(sub_count), function(index) {
+        count_id <- paste0("factor_sub_", index)
+        level_count <- input[[count_id]] %||% 2
+        naming_row(
+          "sub_factor", index, sub_internal[[index]], level_count,
+          paste("Subplot factor", LETTERS[index]), count_id
+        )
+      })
+
+      return(tagList(
+        div(
+          class = "factor-config-intro",
+          tags$h3(class = "factor-config-heading", "Factor configuration"),
+          field_note("Edit the generated factor name and level names to match your study. Enter one comma-separated level name for every configured level.")
+        ),
+        div(
+          class = "factor-config-section",
+          tags$h3(class = "factor-config-heading", "Whole-plot factors"),
+          div(class = "naming-grid", main_rows)
+        ),
+        div(
+          class = "factor-config-section",
+          tags$h3(class = "factor-config-heading", "Subplot factors"),
+          div(class = "naming-grid", sub_rows)
+        ),
+        tags$div(
+          style = "display:none",
+          textInput(
+            "level_numbers_main", NULL,
+            value = paste(vapply(seq_len(main_count), function(i) input[[paste0("factor_main_", i)]] %||% 2, numeric(1)), collapse = ",")
+          ),
+          textInput(
+            "level_numbers_sub", NULL,
+            value = paste(vapply(seq_len(sub_count), function(i) input[[paste0("factor_sub_", i)]] %||% 2, numeric(1)), collapse = ",")
+          )
+        )
+      ))
     }
 
+    req(input$num_trt)
+    count_result <- factor_count_result(input$num_trt)
+    if (is.null(count_result$value)) return(factor_count_warning(count_result$message))
+    factor_count <- count_result$value
+    internals <- if (factor_count == 1L) "trt" else paste0("fac", LETTERS[seq_len(factor_count)])
+    rows <- lapply(seq_len(factor_count), function(index) {
+      count_id <- paste0("factor_", index)
+      level_count <- input[[count_id]] %||% 2
+      naming_row(
+        "treatment_factor", index, internals[[index]], level_count,
+        paste("Factor", LETTERS[index]), count_id
+      )
+    })
+
     tagList(
-      tags$hr(style = "margin: 14px 0; border-color: #dce3ee; opacity: 1;"),
-      section_header("tags", "Treatment names", "Replace generated model labels with the names used in your study."),
-      field_note("Enter one comma-separated level name for every level. Names change tables, results, and downloads; the statistical model remains the same."),
-      div(class = "naming-grid", rows)
+      div(
+        class = "factor-config-intro",
+        tags$h3(class = "factor-config-heading", "Factor configuration"),
+        field_note("Edit the generated factor name and level names to match your study. Enter one comma-separated level name for every configured level.")
+      ),
+      div(class = "naming-grid", rows),
+      tags$div(
+        style = "display:none",
+        textInput(
+          "level_numbers", NULL,
+          value = paste(vapply(seq_len(factor_count), function(i) input[[paste0("factor_", i)]] %||% 2, numeric(1)), collapse = ",")
+        )
+      )
     )
+  })
+
+  observe({
+    req(page_started(), input$design_title != "General Design")
+    if (input$design_title == "Split Plot Design") {
+      req(input$num_trt_main, input$num_trt_sub)
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      req(!is.null(main_result$value), !is.null(sub_result$value))
+      main_count <- main_result$value
+      sub_count <- sub_result$value
+      main_values <- vapply(seq_len(main_count), function(i) input[[paste0("factor_main_", i)]] %||% 2, numeric(1))
+      sub_values <- vapply(seq_len(sub_count), function(i) input[[paste0("factor_sub_", i)]] %||% 2, numeric(1))
+      updateTextInput(session, "level_numbers_main", value = paste(main_values, collapse = ","))
+      updateTextInput(session, "level_numbers_sub", value = paste(sub_values, collapse = ","))
+    } else {
+      req(input$num_trt)
+      count_result <- factor_count_result(input$num_trt)
+      req(!is.null(count_result$value))
+      factor_count <- count_result$value
+      values <- vapply(seq_len(factor_count), function(i) input[[paste0("factor_", i)]] %||% 2, numeric(1))
+      updateTextInput(session, "level_numbers", value = paste(values, collapse = ","))
+    }
   })
 
   active_treatment_label_spec <- reactive({
@@ -1356,11 +1235,12 @@ server<-function(input,output,session) {
     if (input$design_title == "General Design") return(list())
 
     if (input$design_title == "Split Plot Design") {
-      req(input$num_trt_main, input$num_trt_sub, input$level_numbers_main, input$level_numbers_sub)
-      main_count <- validate_factor_count(input$num_trt_main)
-      sub_count <- validate_factor_count(input$num_trt_sub)
-      main_levels <- treatment_level_counts(input$level_numbers_main, main_count)
-      sub_levels <- treatment_level_counts(input$level_numbers_sub, sub_count)
+      req(input$num_trt_main, input$num_trt_sub)
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      req(!is.null(main_result$value), !is.null(sub_result$value))
+      main_count <- main_result$value
+      sub_count <- sub_result$value
       main_internal <- if (main_count == 1L) "trt.main" else paste0("fac", LETTERS[seq_len(main_count)], ".main")
       sub_internal <- if (sub_count == 1L) "trt.sub" else paste0("fac", LETTERS[seq_len(sub_count)], ".sub")
 
@@ -1368,32 +1248,33 @@ server<-function(input,output,session) {
         lapply(seq_len(main_count), function(index) {
           build_treatment_factor_spec(
             main_internal[[index]],
-            input[[paste0("main_factor_name_", index)]],
-            input[[paste0("main_factor_levels_", index)]],
-            main_levels[[index]]
+            input[[paste0("main_factor_name_", index)]] %||% main_internal[[index]],
+            input[[paste0("main_factor_levels_", index)]] %||% paste0(main_internal[[index]], 1:2, collapse = ", "),
+            input[[paste0("factor_main_", index)]] %||% 2
           )
         }),
         lapply(seq_len(sub_count), function(index) {
           build_treatment_factor_spec(
             sub_internal[[index]],
-            input[[paste0("sub_factor_name_", index)]],
-            input[[paste0("sub_factor_levels_", index)]],
-            sub_levels[[index]]
+            input[[paste0("sub_factor_name_", index)]] %||% sub_internal[[index]],
+            input[[paste0("sub_factor_levels_", index)]] %||% paste0(sub_internal[[index]], 1:2, collapse = ", "),
+            input[[paste0("factor_sub_", index)]] %||% 2
           )
         })
       ))
     }
 
-    req(input$num_trt, input$level_numbers)
-    factor_count <- validate_factor_count(input$num_trt)
-    level_counts <- treatment_level_counts(input$level_numbers, factor_count)
+    req(input$num_trt)
+    count_result <- factor_count_result(input$num_trt)
+    req(!is.null(count_result$value))
+    factor_count <- count_result$value
     internals <- if (factor_count == 1L) "trt" else paste0("fac", LETTERS[seq_len(factor_count)])
     lapply(seq_len(factor_count), function(index) {
       build_treatment_factor_spec(
         internals[[index]],
-        input[[paste0("treatment_factor_name_", index)]],
-        input[[paste0("treatment_factor_levels_", index)]],
-        level_counts[[index]]
+        input[[paste0("treatment_factor_name_", index)]] %||% internals[[index]],
+        input[[paste0("treatment_factor_levels_", index)]] %||% paste0(internals[[index]], 1:2, collapse = ", "),
+        input[[paste0("factor_", index)]] %||% 2
       )
     })
   })
@@ -1404,72 +1285,57 @@ server<-function(input,output,session) {
     spec
   })
 
-  observe({
-    req(page_started(), input$design_title)
-    if (input$design_title == "General Design") return(NULL)
-
-    spec <- display_treatment_label_spec()
-    display_label <- function(factor, fallback) {
-      if (
-        is.null(factor) || identical(factor$name, factor$internal) ||
-          !nzchar(trimws(factor$name))
-      ) {
-        return(fallback)
-      }
-      factor$name
-    }
-
-    if (input$design_title == "Split Plot Design") {
-      main_result <- factor_count_result(input$num_trt_main)
-      sub_result <- factor_count_result(input$num_trt_sub)
-      if (is.null(main_result$value) || is.null(sub_result$value)) return(NULL)
-      main_count <- main_result$value
-      sub_count <- sub_result$value
-      for (index in seq_len(main_count)) {
-        updateNumericInput(
-          session,
-          paste0("factor_main_", index),
-          label = display_label(
-            if (index <= length(spec)) spec[[index]] else NULL,
-            paste0("Factor ", LETTERS[index])
-          )
+  factor_feedback <- function(factor, spec) {
+    expected <- suppressWarnings(as.integer(factor$level_count))
+    entered <- length(factor$levels)
+    messages <- treatment_factor_validation_messages(factor, spec)
+    tagList(
+      tags$span(
+        class = "level-name-count",
+        sprintf("%d of %s level names entered", entered, if (is.na(expected)) "?" else expected)
+      ),
+      lapply(messages, function(message) {
+        tags$span(
+          class = if (grepl("extra level", message, fixed = TRUE)) "factor-inline-warning" else "factor-inline-error",
+          icon(if (grepl("extra level", message, fixed = TRUE)) "triangle-exclamation" else "circle-exclamation"),
+          " ", message
         )
-      }
-      for (index in seq_len(sub_count)) {
-        spec_index <- main_count + index
-        updateNumericInput(
-          session,
-          paste0("factor_sub_", index),
-          label = display_label(
-            if (spec_index <= length(spec)) spec[[spec_index]] else NULL,
-            paste0("Factor ", LETTERS[index])
-          )
-        )
-      }
-      return(NULL)
-    }
+      })
+    )
+  }
 
-    count_result <- factor_count_result(input$num_trt)
-    if (is.null(count_result$value)) return(NULL)
-    factor_count <- count_result$value
-    for (index in seq_len(factor_count)) {
-      updateNumericInput(
-        session,
-        paste0("factor_", index),
-        label = display_label(
-          if (index <= length(spec)) spec[[index]] else NULL,
-          paste0("Factor ", LETTERS[index])
-        )
-      )
-    }
-  })
+  for (index in seq_len(MAX_TREATMENT_FACTORS)) {
+    local({
+      i <- index
+      output[[paste0("treatment_factor_feedback_", i)]] <- renderUI({
+        req(input$design_title != "Split Plot Design")
+        spec <- active_treatment_label_spec()
+        req(i <= length(spec))
+        factor_feedback(spec[[i]], spec)
+      })
+      output[[paste0("main_factor_feedback_", i)]] <- renderUI({
+        req(input$design_title == "Split Plot Design")
+        spec <- active_treatment_label_spec()
+        main_count <- validate_factor_count(input$num_trt_main)
+        req(i <= main_count, i <= length(spec))
+        factor_feedback(spec[[i]], spec)
+      })
+      output[[paste0("sub_factor_feedback_", i)]] <- renderUI({
+        req(input$design_title == "Split Plot Design")
+        spec <- active_treatment_label_spec()
+        main_count <- validate_factor_count(input$num_trt_main)
+        req(i <= validate_factor_count(input$num_trt_sub), main_count + i <= length(spec))
+        factor_feedback(spec[[main_count + i]], spec)
+      })
+    })
+  }
 
   output$treatment_names_validation <- renderUI({
     req(page_started(), input$design_title != "General Design")
     spec <- active_treatment_label_spec()
     message <- validate_treatment_label_spec(spec)
     if (is.null(message)) {
-      div(class = "validation-success", icon("circle-check"), " Treatment names are ready.")
+      div(class = "validation-success", icon("circle-check"), " Factor settings are ready.")
     } else {
       div(class = "validation-error", icon("triangle-exclamation"), " ", message)
     }

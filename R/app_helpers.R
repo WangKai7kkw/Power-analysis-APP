@@ -166,13 +166,85 @@ parse_treatment_labels <- function(value) {
   trimws(strsplit(value, ",", fixed = TRUE)[[1]])
 }
 
+generated_treatment_level_names <- function(internal, level_count) {
+  level_count <- suppressWarnings(as.integer(level_count))
+  if (is.na(level_count) || level_count < 1L) return(character(0))
+  paste0(internal, seq_len(level_count))
+}
+
+reconcile_treatment_level_names <- function(value, internal, level_count) {
+  defaults <- generated_treatment_level_names(internal, level_count)
+  if (is.null(value)) return(defaults)
+  current <- parse_treatment_labels(value)
+  if (!length(current)) return(character(0))
+
+  generated_level_pattern <- "^(trt|fac[A-Z])(\\.(main|sub))?[0-9]+$"
+  if (all(grepl(generated_level_pattern, current))) {
+    return(defaults)
+  }
+
+  # Customized names survive a reduction in the configured level count. The UI
+  # explains that the extra names remain available and asks the user to either
+  # restore the level count or remove them deliberately.
+  if (length(current) >= length(defaults)) return(current)
+  c(current, defaults[seq.int(length(current) + 1L, length(defaults))])
+}
+
+treatment_factor_validation_messages <- function(factor, spec = list()) {
+  messages <- character(0)
+  factor_name <- trimws(value_or_default(factor$name, ""))
+  level_count <- suppressWarnings(as.numeric(factor$level_count))
+
+  if (!nzchar(factor_name)) {
+    messages <- c(messages, "Enter a factor name.")
+  } else if (grepl(",", factor_name, fixed = TRUE)) {
+    messages <- c(messages, "Factor names cannot contain commas.")
+  } else if (length(spec)) {
+    all_names <- tolower(trimws(vapply(spec, `[[`, character(1), "name")))
+    if (sum(all_names == tolower(factor_name)) > 1L) {
+      messages <- c(messages, "Factor names must be unique.")
+    }
+  }
+
+  if (
+    length(level_count) != 1L || is.na(level_count) || !is.finite(level_count) ||
+      level_count != floor(level_count) || level_count < 2L
+  ) {
+    messages <- c(messages, "Number of levels must be a whole number of 2 or greater.")
+    return(unique(messages))
+  }
+
+  entered <- length(factor$levels)
+  if (entered < level_count) {
+    messages <- c(messages, sprintf(
+      "Add %d more level %s.",
+      level_count - entered,
+      if (level_count - entered == 1L) "name" else "names"
+    ))
+  } else if (entered > level_count) {
+    messages <- c(messages, sprintf(
+      "%d extra level %s retained. Restore the level count or remove %s deliberately.",
+      entered - level_count,
+      if (entered - level_count == 1L) "name is" else "names are",
+      if (entered - level_count == 1L) "it" else "them"
+    ))
+  }
+  if (any(!nzchar(factor$levels))) {
+    messages <- c(messages, "Every configured level needs a name.")
+  }
+  if (anyDuplicated(tolower(factor$levels))) {
+    messages <- c(messages, "Level names must be unique within this factor.")
+  }
+  unique(messages)
+}
+
 build_treatment_factor_spec <- function(internal, display_name, level_labels, level_count) {
   list(
     internal = internal,
     name = trimws(value_or_default(display_name, "")),
     levels = parse_treatment_labels(level_labels),
-    defaults = paste0(internal, seq_len(level_count)),
-    level_count = as.integer(level_count)
+    defaults = generated_treatment_level_names(internal, level_count),
+    level_count = suppressWarnings(as.numeric(level_count))
   )
 }
 
@@ -191,6 +263,14 @@ validate_treatment_label_spec <- function(spec) {
   }
 
   for (factor in spec) {
+    numeric_count <- suppressWarnings(as.numeric(factor$level_count))
+    if (
+      length(numeric_count) != 1L || is.na(numeric_count) ||
+        !is.finite(numeric_count) || numeric_count != floor(numeric_count) ||
+        numeric_count < 2L
+    ) {
+      return(sprintf("Number of levels for %s must be a whole number of 2 or greater.", factor$name))
+    }
     if (length(factor$levels) != factor$level_count) {
       return(sprintf(
         "%s needs %d comma-separated level names; %d were provided.",

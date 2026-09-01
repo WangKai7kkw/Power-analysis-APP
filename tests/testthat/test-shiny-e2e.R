@@ -37,7 +37,7 @@ test_that("Power Calculation renders the CRD result tables", {
     "document.querySelector('#factor_1') &&
       window.HTMLWidgets &&
       window.HTMLWidgets.find('#design_table')",
-    timeout = 15 * 1000
+    timeout = 30 * 1000
   )
   app$set_inputs(
     factor_1 = 4,
@@ -45,22 +45,14 @@ test_that("Power Calculation renders the CRD result tables", {
     wait_ = FALSE,
     priority_ = "event"
   )
-  app$set_inputs(level_numbers = "4", priority_ = "event")
   app$wait_for_js(
     "window.HTMLWidgets &&
       window.HTMLWidgets.find('#design_table') &&
       window.HTMLWidgets.find('#design_variance_table') &&
-      document.querySelector('#treatment_factor_name_1')",
+      document.querySelector('#treatment_factor_name_1') &&
+      document.querySelector('#treatment_factor_levels_1').value === 'trt1, trt2, trt3, trt4' &&
+      document.querySelector('#treatment_factor_feedback_1').innerText.includes('4 of 4 level names entered')",
     timeout = 15 * 1000
-  )
-  app$run_js(
-    "window.HTMLWidgets.find('#design_table').hot.setDataAtCell([
-        [0, 0, 35],
-        [1, 0, 30],
-        [2, 0, 37],
-        [3, 0, 38]
-      ]);
-      window.HTMLWidgets.find('#design_variance_table').hot.setDataAtCell(0, 0, 15);"
   )
   app$set_inputs(
     treatment_factor_name_1 = "Diet",
@@ -73,6 +65,16 @@ test_that("Power Calculation renders the CRD result tables", {
       window.HTMLWidgets.find('#design_table').hot.getRowHeader()[3] === 'High dose'",
     timeout = 15 * 1000
   )
+  app$run_js(
+    "window.HTMLWidgets.find('#design_table').hot.setDataAtCell([
+        [0, 0, 35],
+        [1, 0, 30],
+        [2, 0, 37],
+        [3, 0, 38]
+      ]);
+      window.HTMLWidgets.find('#design_variance_table').hot.setDataAtCell(0, 0, 15);"
+  )
+  app$wait_for_idle()
   expect_identical(
     app$get_js("window.HTMLWidgets.find('#design_table').hot.countRows()"),
     4L
@@ -169,30 +171,57 @@ test_that("custom factor names appear throughout multifactor model controls", {
   app$set_inputs(num_trt = 2, wait_ = FALSE, priority_ = "event")
   app$wait_for_js(
     "document.querySelector('#factor_2') &&
-      document.querySelector('#treatment_factor_name_2')",
-    timeout = 15 * 1000
+      document.querySelector('#treatment_factor_name_2') &&
+      document.querySelector('#treatment_factor_feedback_1').innerText.includes('2 of 2 level names entered') &&
+      document.querySelector('#treatment_factor_feedback_2').innerText.includes('2 of 2 level names entered') &&
+      document.querySelector('#treatment_names_validation').innerText.includes('Factor settings are ready')",
+    timeout = 30 * 1000
   )
+  expect_true(isTRUE(app$get_js(
+    "document.querySelector('#treatment_factor_name_1').value === 'facA' &&
+      document.querySelector('#treatment_factor_levels_1').value === 'facA1, facA2' &&
+      document.querySelector('#treatment_factor_name_2').value === 'facB' &&
+      document.querySelector('#treatment_factor_levels_2').value === 'facB1, facB2'"
+  )))
   app$set_inputs(
     treatment_factor_name_1 = "Diet",
     treatment_factor_levels_1 = "Control, Supplement",
-    wait_ = FALSE,
-    priority_ = "event"
-  )
-  app$wait_for_js(
-    "document.querySelector('label[for=\"factor_1\"]').textContent.trim() === 'Diet'",
-    timeout = 15 * 1000
-  )
-  app$set_inputs(
     treatment_factor_name_2 = "Time",
     treatment_factor_levels_2 = "Week 1, Week 2",
     wait_ = FALSE,
     priority_ = "event"
   )
   app$wait_for_js(
-    "document.querySelector('label[for=\"factor_1\"]').textContent.trim() === 'Diet' &&
-      document.querySelector('label[for=\"factor_2\"]').textContent.trim() === 'Time' &&
+    "document.querySelector('#treatment_factor_name_1').value === 'Diet' &&
+      document.querySelector('#treatment_factor_name_2').value === 'Time' &&
       document.querySelector('#model_ui').innerText.includes('Diet + Time') &&
       !document.querySelector('#model_ui').innerText.includes('facA')",
+    timeout = 15 * 1000
+  )
+
+  app$set_inputs(factor_1 = 3, wait_ = FALSE, priority_ = "event")
+  app$wait_for_js(
+    "document.querySelector('#treatment_factor_name_1').value === 'Diet' &&
+      document.querySelector('#treatment_factor_levels_1').value === 'Control, Supplement, facA3' &&
+      document.querySelector('#treatment_factor_feedback_1').innerText.includes('3 of 3 level names entered') &&
+      document.querySelector('#treatment_factor_name_2').value === 'Time' &&
+      document.querySelector('#treatment_factor_levels_2').value === 'Week 1, Week 2'",
+    timeout = 15 * 1000
+  )
+
+  app$set_inputs(num_trt = 3, wait_ = FALSE, priority_ = "event")
+  app$wait_for_js(
+    "document.querySelector('#treatment_factor_name_3') &&
+      document.querySelector('#treatment_factor_name_1').value === 'Diet' &&
+      document.querySelector('#treatment_factor_name_2').value === 'Time'",
+    timeout = 15 * 1000
+  )
+  app$set_inputs(num_trt = 2, wait_ = FALSE, priority_ = "event")
+  app$wait_for_js(
+    "!document.querySelector('#treatment_factor_name_3') &&
+      document.querySelector('#treatment_factor_name_1').value === 'Diet' &&
+      document.querySelector('#treatment_factor_levels_1').value === 'Control, Supplement, facA3' &&
+      document.querySelector('#treatment_factor_name_2').value === 'Time'",
     timeout = 15 * 1000
   )
 

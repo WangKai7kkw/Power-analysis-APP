@@ -12,7 +12,7 @@ shiny::testServer(app_environment$server, {
     start_btn = 1,
     design_title = "Completely Randomized Design",
     num_trt = 1,
-    level_numbers = "4",
+    factor_1 = 4,
     num_rep = 8,
     interaction_option = "No",
     Type = "F-test",
@@ -26,22 +26,22 @@ shiny::testServer(app_environment$server, {
     session$flushReact()
     stopifnot(grepl(
       "integer between 1 and 8",
-      output$level_number_ui$html,
+      output$treatment_names_ui$html,
       fixed = TRUE
     ))
   }
 
   session$setInputs(
     num_trt = max_factors,
-    level_numbers = paste(rep(2, max_factors), collapse = ",")
+    factor_1 = 2
   )
   session$flushReact()
   stopifnot(!grepl(
     "integer between 1 and 8",
-    output$level_number_ui$html,
+    output$treatment_names_ui$html,
     fixed = TRUE
   ))
-  stopifnot(grepl('id="factor_8"', output$level_number_ui$html, fixed = TRUE))
+  stopifnot(grepl('id="factor_8"', output$treatment_names_ui$html, fixed = TRUE))
 
   session$setInputs(
     design_title = "Split Plot Design",
