@@ -27,8 +27,22 @@ test_that("unsupported and empty uploads fail clearly", {
 
 test_that("factor generation is bounded", {
   expect_equal(generate_factor_combinations_safe(2), c("facA", "facB", "facA:facB"))
-  expect_error(validate_factor_count(0), "positive integer")
-  expect_error(validate_factor_count(MAX_TREATMENT_FACTORS + 1), "At most")
+  expect_identical(MAX_TREATMENT_FACTORS, 8L)
+  expect_identical(validate_factor_count(1), 1L)
+  expect_identical(validate_factor_count(MAX_TREATMENT_FACTORS), 8L)
+  expect_length(
+    generate_factor_combinations_safe(MAX_TREATMENT_FACTORS),
+    2^MAX_TREATMENT_FACTORS - 1L
+  )
+
+  invalid_counts <- list(0, 9, 1.5, NA_real_, Inf, "not a number", c(1, 2))
+  for (count in invalid_counts) {
+    expect_error(
+      validate_factor_count(count),
+      "integer between 1 and 8",
+      fixed = TRUE
+    )
+  }
 })
 
 test_that("custom contrasts reject unsafe values", {

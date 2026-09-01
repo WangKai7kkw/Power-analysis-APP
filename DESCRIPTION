@@ -9,7 +9,7 @@ Description: An interactive Shiny application built on the pwr4exp package.
 License: GPL (>= 2)
 Encoding: UTF-8
 Depends:
-    R (>= 4.2)
+    R (>= 4.4)
 Imports:
     shiny,
     pwr4exp,

@@ -1,4 +1,4 @@
-name: Deploy Shiny app to shinyapps.io
+name: Test and deploy Shiny app
 
 on:
   push:
@@ -10,18 +10,59 @@ on:
       - "renv.lock"
       - "tests/**"
       - "www/**"
+      - ".rscignore"
+      - ".github/workflows/deploy-shinyapps.yml"
+  pull_request:
+    paths:
+      - "app.R"
+      - "R/**"
+      - "DESCRIPTION"
+      - "renv.lock"
+      - "tests/**"
+      - "www/**"
+      - ".rscignore"
       - ".github/workflows/deploy-shinyapps.yml"
   workflow_dispatch:
 
 concurrency:
-  group: deploy-shinyapps
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      deployable: ${{ steps.deployable.outputs.changed }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect deployable application changes
+        id: deployable
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$EVENT_NAME" != "push" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- \
+            app.R R DESCRIPTION renv.lock www .rscignore; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,6 +75,7 @@ jobs:
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
+          r-version: "4.6.1"
           use-public-rspm: true
 
       - name: Restore locked R dependencies
@@ -47,6 +89,24 @@ jobs:
 
       - name: Parse application source
         run: Rscript -e 'invisible(parse(file="app.R")); invisible(parse(file="R/app_helpers.R"))'
+
+  deploy:
+    needs: [changes, test]
+    if: needs.changes.outputs.deployable == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: "4.6.1"
+          use-public-rspm: true
+
+      - name: Restore locked R dependencies
+        uses: r-lib/actions/setup-renv@v2
 
       - name: Deploy to shinyapps.io
         env:

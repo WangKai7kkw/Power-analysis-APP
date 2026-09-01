@@ -253,6 +253,25 @@ server<-function(input,output,session) {
   generate_factor_combinations <- function(n){
     generate_factor_combinations_safe(n)
   }
+
+  factor_count_result <- function(value) {
+    tryCatch(
+      list(value = validate_factor_count(value), message = NULL),
+      error = function(error) {
+        list(value = NULL, message = conditionMessage(error))
+      }
+    )
+  }
+
+  factor_count_warning <- function(message) {
+    div(
+      class = "alert alert-warning",
+      role = "alert",
+      style = "margin-top:6px; padding:8px 12px;",
+      icon("triangle-exclamation"),
+      tags$span(style = "margin-left:6px;", message)
+    )
+  }
   
   filter_combinations <- function(all_combinations, exclude_factors) {
     if (length(exclude_factors) == 0) return(all_combinations)
@@ -311,6 +330,7 @@ server<-function(input,output,session) {
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               step = 1,
                                width = '100%')
               )
           ),
@@ -363,6 +383,7 @@ server<-function(input,output,session) {
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               step = 1,
                                width = "100%")
               )
           ),
@@ -413,6 +434,7 @@ server<-function(input,output,session) {
               div(style="flex:1;",
                   numericInput("num_trt", "Number of treatment factors", 
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               step = 1,
                                width = "100%")
               )
           ),
@@ -478,6 +500,7 @@ server<-function(input,output,session) {
               div(style="flex:1;",
                   numericInput("num_trt_main", "Number of main plot factors", 
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               step = 1,
                                width="100%")
               )
           ),
@@ -490,6 +513,7 @@ server<-function(input,output,session) {
               div(style="flex:1;",
                   numericInput("num_trt_sub", "Number of sub plot factors",
                                value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+                               step = 1,
                                width="100%")
               )
           ),
@@ -621,8 +645,14 @@ server<-function(input,output,session) {
   
   output$level_number_ui <- renderUI({
     req(page_started())
-    req(input$num_trt)
-    num_inputs <- lapply(seq_len(input$num_trt), function(i) {
+    req(!is.null(input$num_trt))
+    count_result <- factor_count_result(input$num_trt)
+    if (is.null(count_result$value)) {
+      return(factor_count_warning(count_result$message))
+    }
+    factor_count <- count_result$value
+
+    num_inputs <- lapply(seq_len(factor_count), function(i) {
       factor_name <- paste0("Factor ", LETTERS[i])
       tags$div(
         style = "display: flex; flex-direction: column; align-items: center;",
@@ -642,14 +672,14 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers",
         label = NULL,
-        value = paste(rep(2, input$num_trt), collapse = ",")
+        value = paste(rep(2, factor_count), collapse = ",")
       )
     )
     
     observeEvent(
-      lapply(seq_len(input$num_trt), function(i) input[[paste0("factor_", i)]]),
+      lapply(seq_len(factor_count), function(i) input[[paste0("factor_", i)]]),
       {
-        factor_values <- sapply(seq_len(input$num_trt), function(i) {
+        factor_values <- sapply(seq_len(factor_count), function(i) {
           input[[paste0("factor_", i)]] %||% 2
         })
         updateTextInput(
@@ -674,9 +704,14 @@ server<-function(input,output,session) {
   
   output$level_numbers_main_ui <- renderUI({
     req(page_started())
-    req(input$num_trt_main)
+    req(!is.null(input$num_trt_main))
+    count_result <- factor_count_result(input$num_trt_main)
+    if (is.null(count_result$value)) {
+      return(factor_count_warning(count_result$message))
+    }
+    factor_count <- count_result$value
     
-    num_inputs_main <- lapply(seq_len(input$num_trt_main), function(i) {
+    num_inputs_main <- lapply(seq_len(factor_count), function(i) {
       factor_name_main <- paste0("Factor ", LETTERS[i])
       
       tags$div(
@@ -697,14 +732,14 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_main",
         label = NULL,
-        value = paste(rep(2, input$num_trt_main), collapse = ",")
+        value = paste(rep(2, factor_count), collapse = ",")
       )
     )
     
     observeEvent(
-      lapply(seq_len(input$num_trt_main), function(i) input[[paste0("factor_main_", i)]]),
+      lapply(seq_len(factor_count), function(i) input[[paste0("factor_main_", i)]]),
       {
-        factor_values_main <- sapply(seq_len(input$num_trt_main), function(i) {
+        factor_values_main <- sapply(seq_len(factor_count), function(i) {
           input[[paste0("factor_main_", i)]] %||% 2
         })
         updateTextInput(
@@ -729,9 +764,14 @@ server<-function(input,output,session) {
   
   output$level_numbers_sub_ui <- renderUI({
     req(page_started())
-    req(input$num_trt_sub)
+    req(!is.null(input$num_trt_sub))
+    count_result <- factor_count_result(input$num_trt_sub)
+    if (is.null(count_result$value)) {
+      return(factor_count_warning(count_result$message))
+    }
+    factor_count <- count_result$value
     
-    num_inputs_sub <- lapply(seq_len(input$num_trt_sub), function(i) {
+    num_inputs_sub <- lapply(seq_len(factor_count), function(i) {
       factor_name_sub <- paste0("Factor ", LETTERS[i])
       
       tags$div(
@@ -752,14 +792,14 @@ server<-function(input,output,session) {
       textInput(
         inputId = "level_numbers_sub",
         label = NULL,
-        value = paste(rep(2, input$num_trt_sub), collapse = ",")
+        value = paste(rep(2, factor_count), collapse = ",")
       )
     )
     
     observeEvent(
-      lapply(seq_len(input$num_trt_sub), function(i) input[[paste0("factor_sub_", i)]]),
+      lapply(seq_len(factor_count), function(i) input[[paste0("factor_sub_", i)]]),
       {
-        factor_values_sub <- sapply(seq_len(input$num_trt_sub), function(i) {
+        factor_values_sub <- sapply(seq_len(factor_count), function(i) {
           input[[paste0("factor_sub_", i)]] %||% 2
         })
         updateTextInput(
@@ -975,12 +1015,12 @@ server<-function(input,output,session) {
   output$interaction_exist_ui <- renderUI({
     req(page_started())
     if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$num_trt)
-      if (is.null(input$num_trt) || input$num_trt == "") {
-        return(NULL)
+      req(!is.null(input$num_trt))
+      count_result <- factor_count_result(input$num_trt)
+      if (is.null(count_result$value)) {
+        return(factor_count_warning(count_result$message))
       }
-      num_trt_value <- suppressWarnings(as.numeric(input$num_trt))
-      if (is.na(num_trt_value) || num_trt_value <= 1) {
+      if (count_result$value <= 1L) {
         return(NULL)
       }else {
         div(
@@ -997,16 +1037,20 @@ server<-function(input,output,session) {
         )
       }
     }else if(input$design_title=='Split Plot Design'){
-      req(input$num_trt_main)
-      req(input$num_trt_sub)
-      if (input$num_trt_main + input$num_trt_sub > MAX_TREATMENT_FACTORS) {
-        return(div(
-          style = "color:#d9534f; margin-top:6px;",
-          sprintf(
-            "Main-plot and sub-plot factors combined cannot exceed %d.",
-            MAX_TREATMENT_FACTORS
-          )
-        ))
+      req(!is.null(input$num_trt_main), !is.null(input$num_trt_sub))
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      if (is.null(main_result$value)) {
+        return(factor_count_warning(main_result$message))
+      }
+      if (is.null(sub_result$value)) {
+        return(factor_count_warning(sub_result$message))
+      }
+      if (main_result$value + sub_result$value > MAX_TREATMENT_FACTORS) {
+        return(factor_count_warning(sprintf(
+          "Main-plot and sub-plot factors combined cannot exceed %d.",
+          MAX_TREATMENT_FACTORS
+        )))
       }
       
       div(
@@ -1031,11 +1075,11 @@ server<-function(input,output,session) {
       return(NULL)
     }
     if(!input$design_title%in%c('Split Plot Design','General Design')){
-      req(input$num_trt)
-      if(input$num_trt>1){
-        fac_names <- paste0("fac", LETTERS[1:input$num_trt])
+      factor_count <- levels_num_trt()
+      if(factor_count>1){
+        fac_names <- paste0("fac", LETTERS[seq_len(factor_count)])
         all_combinations <- unlist(
-          lapply(2:input$num_trt, function(k) {
+          lapply(2:factor_count, function(k) {
             combn(fac_names, k, FUN = function(x) paste(x, collapse = " : "))
           })
         )
@@ -1061,20 +1105,20 @@ server<-function(input,output,session) {
         NULL
       }
     }else if(input$design_title=='Split Plot Design'){
-      req(input$num_trt_main)
-      req(input$num_trt_sub)
-      req(input$num_trt_main + input$num_trt_sub <= MAX_TREATMENT_FACTORS)
+      num_trt_main <- levels_num_trt_main()
+      num_trt_sub <- levels_num_trt_sub()
+      req(num_trt_main + num_trt_sub <= MAX_TREATMENT_FACTORS)
       
-      if(input$num_trt_main==1){
+      if(num_trt_main==1){
         fac_names_main<-'trt.main'
-      }else if(input$num_trt_main>1){
-        fac_names_main <- paste0("fac", LETTERS[1:input$num_trt_main],'.main')
+      }else if(num_trt_main>1){
+        fac_names_main <- paste0("fac", LETTERS[seq_len(num_trt_main)],'.main')
       }
       
-      if(input$num_trt_sub==1){
+      if(num_trt_sub==1){
         fac_names_sub<-'trt.sub'
-      }else if(input$num_trt_sub>1){
-        fac_names_sub <- paste0("fac", LETTERS[1:input$num_trt_sub],'.sub')
+      }else if(num_trt_sub>1){
+        fac_names_sub <- paste0("fac", LETTERS[seq_len(num_trt_sub)],'.sub')
       }
       
       fac_names<-c(fac_names_main,fac_names_sub)
@@ -1264,20 +1308,26 @@ server<-function(input,output,session) {
   
   levels_num_trt<-reactive({
     req(page_started())
-    req(input$num_trt)
-    as.numeric(input$num_trt)
+    req(!is.null(input$num_trt))
+    count_result <- factor_count_result(input$num_trt)
+    req(!is.null(count_result$value))
+    count_result$value
   })
   
   levels_num_trt_main<-reactive({
     req(page_started())
-    req(input$num_trt_main)
-    as.numeric(input$num_trt_main)
+    req(!is.null(input$num_trt_main))
+    count_result <- factor_count_result(input$num_trt_main)
+    req(!is.null(count_result$value))
+    count_result$value
   })
   
   levels_num_trt_sub<-reactive({
     req(page_started())
-    req(input$num_trt_sub)
-    as.numeric(input$num_trt_sub)
+    req(!is.null(input$num_trt_sub))
+    count_result <- factor_count_result(input$num_trt_sub)
+    req(!is.null(count_result$value))
+    count_result$value
   })
   
   interaction_formula_number<-reactive({
@@ -1608,21 +1658,22 @@ server<-function(input,output,session) {
     req(page_started())
     output$input_data_ui <- renderUI({
       if(!input$design_title%in%c('Split Plot Design','General Design')){
-        req(input$num_trt)
-        note_text <- if (input$num_trt>=2) {
+        factor_count <- levels_num_trt()
+        note_text <- if (factor_count>=2) {
           req(input$interaction_option)
           if(input$interaction_option=='Yes'){
             "Please provide cell means of all combinations."
           } else if (input$interaction_option == "No") {
             "Please provide marginal means of each factor."
           } 
-        } else if(input$num_trt<=1) {
+        } else if(factor_count<=1) {
           "Please provide marginal means of each factor."
         }
         
       }else if(input$design_title=='Split Plot Design'){
-        req(input$num_trt_main)
-        req(input$num_trt_sub)
+        num_trt_main <- levels_num_trt_main()
+        num_trt_sub <- levels_num_trt_sub()
+        req(num_trt_main + num_trt_sub <= MAX_TREATMENT_FACTORS)
         req(input$interaction_option)
         
         note_text <- if(input$interaction_option=='Yes'){
@@ -2174,6 +2225,7 @@ server<-function(input,output,session) {
     }else if(input$Type=='t-test'){
       if(!input$design_title%in%c("Split Plot Design",'General Design')){
         req(input$num_trt,input$level_numbers)
+        num_trt <- levels_num_trt()
         
         level_nums <-as.numeric(unlist(strsplit(input$level_numbers, ",")))
         
@@ -2188,7 +2240,7 @@ server<-function(input,output,session) {
         }
         
         tagList(
-          if(input$num_trt>1){
+          if(num_trt>1){
             selected_which <- if (is.null(input$which_para)) "facA" else input$which_para
             div(
               style = "flex: 1; padding-top: 2px;width:100%;",
@@ -2197,13 +2249,13 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "The factor of interest",
-                  choices = generate_factor_combinations(input$num_trt),
+                  choices = generate_factor_combinations(num_trt),
                   selected = selected_which,
                   width = "100%")
               )
             )
           },
-          if(input$num_trt>1){
+          if(num_trt>1){
             selected_by <- if (is.null(input$by_para)) "NULL" else input$by_para
             div(
               style = "flex: 1; padding-top: 2px;width:100%;",
@@ -2212,7 +2264,7 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='The variable to condition on',
-                  choices = filter_combinations(generate_factor_combinations(input$num_trt), input$which_para),
+                  choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
                   selected = selected_by,
                   width = "100%")
               )
@@ -2429,6 +2481,7 @@ server<-function(input,output,session) {
     }else if(input$Type=='F-test & t-test'){
       if(!input$design_title%in%c('Split Plot Design','General Design')){
         req(input$num_trt, input$level_numbers)
+        num_trt <- levels_num_trt()
         
         level_nums <-as.numeric(unlist(strsplit(input$level_numbers, ",")))
         
@@ -2456,7 +2509,7 @@ server<-function(input,output,session) {
               sliderInput("p_value1",'Significance level',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
             )
           ),
-          if(input$num_trt>1){
+          if(num_trt>1){
             selected_which <- if (is.null(input$which_para)) "facA" else input$which_para
             div(
               style = "flex: 1; padding-top: 2px;width:100%;",
@@ -2465,12 +2518,12 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "which_para",
                   label = "The factor of interest",
-                  choices = generate_factor_combinations(input$num_trt),
+                  choices = generate_factor_combinations(num_trt),
                   selected = selected_which,width = "100%")
               )
             )
           },
-          if(input$num_trt>1){
+          if(num_trt>1){
             selected_by <- if (is.null(input$by_para)) "NULL" else input$by_para
             div(
               style = "flex: 1; padding-top: 2px;width:100%;",
@@ -2479,7 +2532,7 @@ server<-function(input,output,session) {
                 selectInput(
                   inputId = "by_para",
                   label='The variable to condition on',
-                  choices = filter_combinations(generate_factor_combinations(input$num_trt), input$which_para),
+                  choices = filter_combinations(generate_factor_combinations(num_trt), input$which_para),
                   selected = selected_by,width = "100%")
               )
             )
@@ -2821,10 +2874,11 @@ server<-function(input,output,session) {
     expected_length <- NA 
     
     if(input$design_title!='Split Plot Design'){
-      if (input$num_trt == 1) {
+      factor_count <- levels_num_trt()
+      if (factor_count == 1) {
         expected_length <- level_nums[1]
       } else {  
-        factors <- paste0("fac", LETTERS[1:input$num_trt]) 
+        factors <- paste0("fac", LETTERS[seq_len(factor_count)])
         level_map <- setNames(level_nums, factors)
         chosen <- input$which_para
         if (chosen %in% factors) {
@@ -2924,10 +2978,10 @@ server<-function(input,output,session) {
   observeEvent(input$which_para, {
     req(page_started())
     req(!input$design_title %in% c("Split Plot Design", "General Design"))
-    req(input$num_trt)
+    factor_count <- levels_num_trt()
     updateSelectInput(session=getDefaultReactiveDomain(), "by_para",
-                      choices = filter_combinations(generate_factor_combinations(input$num_trt), input$which_para),
-                      selected = if (input$by_para %in% filter_combinations(generate_factor_combinations(input$num_trt), input$which_para)) {
+                      choices = filter_combinations(generate_factor_combinations(factor_count), input$which_para),
+                      selected = if (input$by_para %in% filter_combinations(generate_factor_combinations(factor_count), input$which_para)) {
                         input$by_para
                       } else {
                         "NULL"
@@ -2954,9 +3008,36 @@ server<-function(input,output,session) {
     return(div(style = "color: #28a745; margin-top: 4px;",
                "Validation complete: all variables exist in the input data."))
   })
+
+  active_factor_count_error <- function() {
+    if (input$design_title == "General Design") {
+      return(NULL)
+    }
+    if (input$design_title == "Split Plot Design") {
+      main_result <- factor_count_result(input$num_trt_main)
+      sub_result <- factor_count_result(input$num_trt_sub)
+      if (!is.null(main_result$message)) return(main_result$message)
+      if (!is.null(sub_result$message)) return(sub_result$message)
+      if (main_result$value + sub_result$value > MAX_TREATMENT_FACTORS) {
+        return(sprintf(
+          "Main-plot and sub-plot factors combined cannot exceed %d.",
+          MAX_TREATMENT_FACTORS
+        ))
+      }
+      return(NULL)
+    }
+
+    factor_count_result(input$num_trt)$message
+  }
   
   observeEvent(input$create_result,{
     req(page_started())
+    req(input$design_title)
+    count_error <- active_factor_count_error()
+    if (!is.null(count_error)) {
+      showNotification(count_error, type = "warning", duration = 8)
+      return(NULL)
+    }
     results_generated(FALSE)
     tryCatch({
       output$results_display <- renderUI({

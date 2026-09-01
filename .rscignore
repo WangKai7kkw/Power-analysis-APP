@@ -1,0 +1,7 @@
+.github
+.gitignore
+.Rprofile
+docs
+Power-analysis-APP.Rproj
+README.md
+tests

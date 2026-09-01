@@ -1,5 +1,5 @@
-MAX_TREATMENT_FACTORS <- 6L
-MAX_INTERACTION_TERMS <- 200L
+MAX_TREATMENT_FACTORS <- 8L
+MAX_INTERACTION_TERMS <- 2^MAX_TREATMENT_FACTORS - 1L
 SUPPORTED_UPLOAD_EXTENSIONS <- c("csv", "xlsx", "xls", "txt", "tsv")
 
 value_or_default <- function(value, default) {
@@ -7,17 +7,22 @@ value_or_default <- function(value, default) {
 }
 
 validate_factor_count <- function(n, max_factors = MAX_TREATMENT_FACTORS) {
-  n <- suppressWarnings(as.integer(n))
-  if (length(n) != 1L || is.na(n) || n < 1L) {
-    stop("The number of treatment factors must be a positive integer.", call. = FALSE)
+  message <- sprintf(
+    "The number of treatment factors must be an integer between 1 and %d.",
+    max_factors
+  )
+  if (length(n) != 1L) {
+    stop(message, call. = FALSE)
   }
-  if (n > max_factors) {
-    stop(
-      sprintf("At most %d treatment factors are supported.", max_factors),
-      call. = FALSE
-    )
+
+  numeric_n <- suppressWarnings(as.numeric(as.character(n)))
+  if (
+    length(numeric_n) != 1L || is.na(numeric_n) || !is.finite(numeric_n) ||
+    numeric_n != floor(numeric_n) || numeric_n < 1 || numeric_n > max_factors
+  ) {
+    stop(message, call. = FALSE)
   }
-  n
+  as.integer(numeric_n)
 }
 
 generate_factor_combinations_safe <- function(

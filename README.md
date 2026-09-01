@@ -10,7 +10,7 @@ The app is deployed at: [https://wangkai.shinyapps.io/power_analyses_app/](https
 
 ### Prerequisites
 
-- R (>= 4.2)
+- R (>= 4.4)
 - `renv`
 
 Restore the exact package versions used by the project:
@@ -64,7 +64,7 @@ The app supports power analysis for a variety of standard experimental designs a
 ## Features
 
 - **Three-panel interface**: Design setup, Power Calculation settings, and Results display
-- **Flexible factor specification**: Define single or multiple treatment factors with any number of levels
+- **Flexible factor specification**: Define up to eight treatment factors with any number of levels
 - **Interaction effects**: Optionally include interaction terms between factors
 - **Means input**: Enter treatment means via an interactive table (cell means for full-factorial models, marginal means for additive models)
 - **Variance input**: Specify variance components for each random effect (block, row, column, main-plot, error)
