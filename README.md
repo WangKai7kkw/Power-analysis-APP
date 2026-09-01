@@ -117,6 +117,13 @@ Click **Power Calculation** to compute power. Results are displayed in the **Pow
 | [data.table](https://rdatatable.gitlab.io/data.table/) | Fast data manipulation |
 | [nlme](https://cran.r-project.org/package=nlme) | Residual correlation structures for General Design mode |
 
+## Known issues
+
+General Design currently has open validation and ordering issues for some
+residual correlation structures. See
+[Known correlation-structure issues](docs/known-correlation-issues.md) for
+affected types, temporary workarounds, and the planned fixes.
+
 ## Development and tests
 
 Run the regression suite from the repository root:
