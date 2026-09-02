@@ -169,6 +169,13 @@ app_css <- "
   .brand-name { font-size: 21px; font-weight: 780; letter-spacing: -.02em; }
   .brand-tagline { color: var(--muted); font-size: 13px; margin-top: -2px; }
 
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .report-issue-button,
   .about-button {
     border: 1px solid var(--border) !important;
     border-radius: 10px !important;
@@ -176,6 +183,12 @@ app_css <- "
     color: var(--ink) !important;
     font-weight: 650 !important;
     padding: 9px 14px !important;
+  }
+  .report-issue-button:hover,
+  .report-issue-button:focus-visible {
+    border-color: #f2b8b5 !important;
+    background: #fff5f4 !important;
+    color: var(--danger) !important;
   }
 
   .design-selector-card {
@@ -469,7 +482,10 @@ app_css <- "
 
   @media (max-width: 520px) {
     .brand-tagline { display: none; }
-    .about-button { font-size: 13px !important; }
+    .app-topbar { flex-wrap: wrap; gap: 12px; }
+    .topbar-actions { width: 100%; }
+    .topbar-actions > * { flex: 1 1 0; }
+    .topbar-actions .btn { width: 100%; white-space: nowrap; font-size: 13px !important; }
     .design-control { grid-template-columns: 1fr; }
     .step-kicker { display: none; }
     .workflow-map { gap: 2px; }
@@ -509,23 +525,34 @@ server<-function(input,output,session) {
             div(class = "brand-tagline", "Power analysis for designed experiments")
           )
         ),
-        tags$div(class = "dropdown",
-                 tags$button(
-                   tagList(icon("circle-info"), " About & resources"),
-                   class = "btn btn-light dropdown-toggle about-button",
-                   type = "button",
-                   `data-bs-toggle` = "dropdown",
-                   `aria-expanded` = "false"
-                 ),
-                 tags$ul(
-                   class = "dropdown-menu",
-                   tags$li(
-                     tags$a(icon("code-branch"), " Package source code", rel="noopener noreferrer", class="dropdown-item", href="https://github.com/an-ethz/pwr4exp", target="_blank")
+        tags$div(
+          class = "topbar-actions",
+          tags$a(
+            tagList(icon("bug"), " Report an issue"),
+            class = "btn btn-light report-issue-button",
+            href = "https://github.com/WangKai7kkw/Power-analysis-APP/issues/new",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            `aria-label` = "Report an issue on GitHub (opens in a new tab)"
+          ),
+          tags$div(class = "dropdown",
+                   tags$button(
+                     tagList(icon("circle-info"), " About & resources"),
+                     class = "btn btn-light dropdown-toggle about-button",
+                     type = "button",
+                     `data-bs-toggle` = "dropdown",
+                     `aria-expanded` = "false"
                    ),
-                   tags$li(
-                     tags$a(icon("book-open"), " Method documentation", rel="noopener noreferrer", class="dropdown-item", href="https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html", target="_blank")
+                   tags$ul(
+                     class = "dropdown-menu",
+                     tags$li(
+                       tags$a(icon("code-branch"), " Package source code", rel="noopener noreferrer", class="dropdown-item", href="https://github.com/an-ethz/pwr4exp", target="_blank")
+                     ),
+                     tags$li(
+                       tags$a(icon("book-open"), " Method documentation", rel="noopener noreferrer", class="dropdown-item", href="https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html", target="_blank")
+                     )
                    )
-                 )
+          )
         )
       ),
       div(

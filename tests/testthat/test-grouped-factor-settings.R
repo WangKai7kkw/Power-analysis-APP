@@ -6,6 +6,26 @@ tryCatch(
   finally = setwd(previous_directory)
 )
 
+test_that("the app header provides an accessible issue-reporting link", {
+  shiny::testServer(app_environment$server, {
+    header_html <- paste(as.character(output$main_ui), collapse = "\n")
+
+    expect_match(header_html, "Report an issue", fixed = TRUE)
+    expect_match(
+      header_html,
+      'href="https://github.com/WangKai7kkw/Power-analysis-APP/issues/new"',
+      fixed = TRUE
+    )
+    expect_match(header_html, 'target="_blank"', fixed = TRUE)
+    expect_match(header_html, 'rel="noopener noreferrer"', fixed = TRUE)
+    expect_match(
+      header_html,
+      'aria-label="Report an issue on GitHub (opens in a new tab)"',
+      fixed = TRUE
+    )
+  })
+})
+
 test_that("grouped factor server state keeps display names separate from identifiers", {
   shiny::testServer(app_environment$server, {
     session$setInputs(
