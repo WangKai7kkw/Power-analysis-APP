@@ -81,7 +81,21 @@ jobs:
       - name: Restore locked R dependencies
         uses: r-lib/actions/setup-renv@v2
 
+      # Do not rely on the browser bundled with the runner image. The image can
+      # change independently of this workflow, which recently left chromote
+      # waiting for a debugging port that never became available.
+      - name: Set up Chrome for end-to-end tests
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+
+      - name: Verify Chrome can run headlessly
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: '"$CHROME_PATH" --headless --no-sandbox --disable-gpu --dump-dom about:blank'
+
       - name: Run regression tests
+        env:
+          CHROMOTE_CHROME: ${{ steps.chrome.outputs.chrome-path }}
         run: Rscript tests/testthat.R
 
       - name: Run Shiny startup smoke test
