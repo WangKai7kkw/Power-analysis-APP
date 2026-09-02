@@ -134,14 +134,17 @@ Run the regression suite from the repository root:
 ```r
 Rscript tests/testthat.R
 Rscript tests/smoke_app.R
+# Optional browser-based tests (requires Chrome):
+Rscript tests/e2e.R
 ```
 
 Power-calculation expectations are taken from the documented examples in the
 official [pwr4exp vignette](https://an-ethz.github.io/pwr4exp/articles/pwr4exp.html).
 The suite also covers upload handling, validation failures, bounded factor
-generation, combined F/t calculations, and residual-correlation errors. The
-`testthat` command also launches the app in headless Chrome, clicks **Power
-Calculation**, and verifies the rendered omnibus and contrast tables.
+generation, combined F/t calculations, and residual-correlation errors.
+Browser-based tests are kept separate from the deployment checks; `tests/e2e.R`
+launches the app in headless Chrome, clicks **Power Calculation**, and verifies
+the rendered omnibus and contrast tables.
 
 ## References
 
