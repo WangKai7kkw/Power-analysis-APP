@@ -32,36 +32,6 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      deployable: ${{ steps.deployable.outputs.changed }}
-    steps:
-      - name: Check out repository history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect deployable application changes
-        id: deployable
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif [[ "$EVENT_NAME" != "push" ]]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          elif [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- \
-            app.R R DESCRIPTION renv.lock www .rscignore; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
   test:
     runs-on: ubuntu-latest
 
@@ -91,8 +61,11 @@ jobs:
         run: Rscript -e 'invisible(parse(file="app.R")); invisible(parse(file="R/app_helpers.R"))'
 
   deploy:
-    needs: [changes, test]
-    if: needs.changes.outputs.deployable == 'true'
+    needs: test
+    # A tests-only commit may be the fix that makes an earlier app change
+    # deployable. Deploy every tested main/workflow_dispatch revision so a
+    # recovered pipeline cannot leave shinyapps.io on an older commit.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
