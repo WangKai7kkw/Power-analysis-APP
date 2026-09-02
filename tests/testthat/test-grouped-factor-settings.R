@@ -121,6 +121,11 @@ test_that("design selection and replication controls are grouped in the left col
   expect_match(general_html, 'id="manual_row_count"', fixed = TRUE)
   expect_match(general_html, 'id="create_manual_table"', fixed = TRUE)
   expect_match(general_html, 'id="custom_layout_table"', fixed = TRUE)
+  expect_match(
+    app_environment$app_css,
+    "#manual_table_feedback > .field-note { margin-top: 10px; }",
+    fixed = TRUE
+  )
   expect_false(grepl("The app reads the column names", general_html, fixed = TRUE))
   expect_false(grepl("Replication is defined by the observation rows", general_html, fixed = TRUE))
   expect_false(grepl("no separate replication field is needed", general_html, fixed = TRUE))
@@ -202,6 +207,18 @@ test_that("custom designs still accept uploaded data", {
 
     expect_equal(names(datavalues$custom_data), c("treatment", "block"))
     expect_equal(nrow(datavalues$custom_data), 2L)
+
+    column_types_html <- paste(as.character(output$file_type_check), collapse = "\n")
+    expect_match(column_types_html, "Column types", fixed = TRUE)
+    expect_match(column_types_html, "column-role-list", fixed = TRUE)
+    expect_match(column_types_html, "column-role-row", fixed = TRUE)
+    expect_match(column_types_html, 'for="factor_type_1"', fixed = TRUE)
+    expect_match(column_types_html, ">Factor<", fixed = TRUE)
+    expect_match(column_types_html, ">Numeric<", fixed = TRUE)
+    expect_false(grepl(">Categorical<", column_types_html, fixed = TRUE))
+    expect_false(grepl("Categorical factor", column_types_html, fixed = TRUE))
+    expect_false(grepl("Continuous covariate", column_types_html, fixed = TRUE))
+    expect_false(grepl("Choose Factor for groups or levels", column_types_html, fixed = TRUE))
   })
 })
 

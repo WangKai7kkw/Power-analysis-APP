@@ -460,7 +460,31 @@ app_css <- "
   }
   .manual-table-feedback.validation-success,
   .manual-table-feedback.validation-error { margin: 12px 0 10px; }
+  #manual_table_feedback > .field-note { margin-top: 10px; }
   #custom_layout_table { margin-top: 10px; overflow-x: auto; }
+  .column-role-list {
+    display: grid;
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .column-role-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) minmax(140px, 1.1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+  }
+  .column-role-name {
+    min-width: 0;
+    margin: 0 !important;
+    overflow-wrap: anywhere;
+  }
+  .column-role-row .form-group { min-width: 0; margin: 0; }
 
   #dynamic_sidebar > .card,
   #dynamic_sidebar > .shiny-html-output > .card,
@@ -1576,15 +1600,20 @@ server<-function(input,output,session) {
     
     type_inputs <- lapply(seq_along(cols), function(i) {
       col_name <- cols[i]
+      input_id <- paste0("factor_type_", i)
       tags$div(
-        style = "display: flex; flex-direction: column; align-items: center;",
-        
+        class = "column-role-row",
+        tags$label(
+          class = "column-role-name",
+          `for` = input_id,
+          col_name
+        ),
         selectInput(
-          inputId = paste0("factor_type_", i),
-          label = col_name,
-          choices = c("Categorical factor" = "Categorical", "Continuous covariate" = "Continuous"),
+          inputId = input_id,
+          label = NULL,
+          choices = c("Factor" = "Categorical", "Numeric" = "Numeric"),
           selected = "Categorical",
-          width = "160px"
+          width = "100%"
         )
       )
       
@@ -1615,11 +1644,10 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Role of each data column",
+      tags$label("Column types",
                  style = "margin-bottom: 10px; display: block;font-weight: bold"),
-      field_note("Categorical columns define groups or levels; continuous columns contain numeric covariates such as time or dose."),
       div(
-        style = "font-size: 12px;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
+        class = "column-role-list",
         type_inputs
       ),
       hidden_text_input
@@ -2300,7 +2328,7 @@ server<-function(input,output,session) {
         for (i in seq_along(cols)) {
           if (types[i] == "Categorical") {
             df[[cols[i]]] <- as.factor(df[[cols[i]]])
-          } else if (types[i] == "Continuous") {
+          } else if (types[i] == "Numeric") {
             df[[cols[i]]] <- as.numeric(df[[cols[i]]])
           }
         }
@@ -4073,7 +4101,7 @@ server<-function(input,output,session) {
         for (i in seq_along(cols)) {
           if (types[i] == "Categorical") {
             df[[cols[i]]] <- as.factor(df[[cols[i]]])
-          } else if (types[i] == "Continuous") {
+          } else if (types[i] == "Numeric") {
             df[[cols[i]]] <- as.numeric(df[[cols[i]]])
           }
         }
