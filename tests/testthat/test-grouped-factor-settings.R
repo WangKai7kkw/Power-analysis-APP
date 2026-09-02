@@ -111,9 +111,16 @@ test_that("design selection and replication controls are grouped in the left col
     as.character(app_environment$replication_settings_ui("General Design")),
     collapse = "\n"
   )
-  expect_match(general_html, "Upload study layout", fixed = TRUE)
-  expect_match(general_html, "Upload a long-format design table", fixed = TRUE)
+  expect_match(general_html, "Study layout", fixed = TRUE)
+  expect_match(general_html, "Provide a long-format design table", fixed = TRUE)
+  expect_match(general_html, 'id="custom_data_source"', fixed = TRUE)
+  expect_match(general_html, ">Upload file<", fixed = TRUE)
+  expect_match(general_html, ">Create table<", fixed = TRUE)
   expect_match(general_html, 'id="uploaded_file"', fixed = TRUE)
+  expect_match(general_html, 'id="manual_column_names"', fixed = TRUE)
+  expect_match(general_html, 'id="manual_row_count"', fixed = TRUE)
+  expect_match(general_html, 'id="create_manual_table"', fixed = TRUE)
+  expect_match(general_html, 'id="custom_layout_table"', fixed = TRUE)
   expect_false(grepl("The app reads the column names", general_html, fixed = TRUE))
   expect_false(grepl("Replication is defined by the observation rows", general_html, fixed = TRUE))
   expect_false(grepl("no separate replication field is needed", general_html, fixed = TRUE))
@@ -123,6 +130,79 @@ test_that("design selection and replication controls are grouped in the left col
     "grid-template-areas: 'design' 'test' 'results'",
     fixed = TRUE
   )
+})
+
+test_that("custom designs can initialize an editable table", {
+  shiny::testServer(app_environment$server, {
+    session$setInputs(
+      start_btn = 1,
+      design_title = "General Design",
+      custom_data_source = "manual",
+      manual_column_names = "treatment, block, period",
+      manual_row_count = 6,
+      create_manual_table = 1
+    )
+    session$flushReact()
+
+    expect_equal(names(datavalues$manual_data), c("treatment", "block", "period"))
+    expect_equal(dim(datavalues$manual_data), c(6L, 3L))
+    expect_match(datavalues$manual_data_error, "Fill every cell", fixed = TRUE)
+    expect_null(datavalues$custom_data)
+
+    table_html <- paste(as.character(output$custom_layout_table), collapse = "\n")
+    expect_match(table_html, '"treatment":""', fixed = TRUE)
+    expect_match(table_html, '"row_above"', fixed = TRUE)
+
+    widget_params <- rhandsontable::rhandsontable(
+      datavalues$manual_data,
+      rowHeaders = TRUE
+    )$x
+    completed_rows <- lapply(seq_len(6), function(index) {
+      list(if (index <= 3) "control" else "treated", as.character(index), as.character(index))
+    })
+    session$setInputs(custom_layout_table = list(
+      data = completed_rows,
+      changes = list(event = "afterChange"),
+      params = widget_params
+    ))
+    session$flushReact()
+
+    expect_null(datavalues$manual_data_error)
+    expect_equal(dim(datavalues$custom_data), c(6L, 3L))
+    expect_equal(datavalues$custom_data$treatment, rep(c("control", "treated"), each = 3))
+
+    session$setInputs(custom_data_source = "upload")
+    session$flushReact()
+    expect_null(datavalues$custom_data)
+
+    session$setInputs(custom_data_source = "manual")
+    session$flushReact()
+    expect_equal(dim(datavalues$custom_data), c(6L, 3L))
+  })
+})
+
+test_that("custom designs still accept uploaded data", {
+  upload_path <- tempfile(fileext = ".csv")
+  writeLines(c("treatment,block", "control,1", "treated,2"), upload_path)
+
+  shiny::testServer(app_environment$server, {
+    session$setInputs(
+      start_btn = 1,
+      design_title = "General Design",
+      custom_data_source = "upload",
+      uploaded_file = data.frame(
+        name = "layout.csv",
+        size = file.info(upload_path)$size,
+        type = "text/csv",
+        datapath = upload_path,
+        stringsAsFactors = FALSE
+      )
+    )
+    session$flushReact()
+
+    expect_equal(names(datavalues$custom_data), c("treatment", "block"))
+    expect_equal(nrow(datavalues$custom_data), 2L)
+  })
 })
 
 test_that("grouped factor server state keeps display names separate from identifiers", {

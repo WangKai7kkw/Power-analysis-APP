@@ -25,6 +25,34 @@ test_that("unsupported and empty uploads fail clearly", {
   )
 })
 
+test_that("manual design tables require valid dimensions and column names", {
+  table <- new_manual_design_table("treatment, block, time", 4)
+
+  expect_equal(names(table), c("treatment", "block", "time"))
+  expect_equal(dim(table), c(4L, 3L))
+  expect_true(all(table == ""))
+  expect_error(new_manual_design_table("", 4), "at least one column name")
+  expect_error(new_manual_design_table("treatment, treatment", 4), "must be unique")
+  expect_error(new_manual_design_table("treatment, , block", 4), "Every column needs a name")
+  expect_error(new_manual_design_table("treatment, block", 0), "between 1 and 1000")
+  expect_error(new_manual_design_table("treatment, block", 1001), "between 1 and 1000")
+})
+
+test_that("manual design data must be completely populated", {
+  incomplete <- data.frame(
+    treatment = c("control", "treated"),
+    block = c("1", ""),
+    check.names = FALSE
+  )
+  complete <- incomplete
+  complete$block[2] <- "2"
+
+  expect_match(manual_design_data_error(incomplete), "Fill every cell", fixed = TRUE)
+  expect_null(manual_design_data_error(complete))
+  names(complete)[2] <- "treatment"
+  expect_match(manual_design_data_error(complete), "unique", fixed = TRUE)
+})
+
 test_that("factor generation is bounded", {
   expect_equal(generate_factor_combinations_safe(2), c("facA", "facB", "facA:facB"))
   expect_identical(MAX_TREATMENT_FACTORS, 8L)

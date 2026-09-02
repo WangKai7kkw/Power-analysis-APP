@@ -137,18 +137,59 @@ replication_settings_ui <- function(design_title) {
   if (identical(design_title, "General Design")) {
     return(tagList(
       section_header(
-        "file-arrow-up", "Upload study layout",
-        "Upload a long-format design table with separate columns for treatment factors and all other design variables."
+        "table", "Study layout",
+        "Provide a long-format design table with separate columns for treatment factors and all other design variables."
       ),
-      fileInput(
-        inputId = "uploaded_file",
-        label = "Study data",
-        accept = c(".csv", ".xlsx", ".xls", ".txt", ".tsv"),
-        buttonLabel = "Choose file",
-        placeholder = "CSV, Excel, TSV, or TXT",
+      radioButtons(
+        inputId = "custom_data_source",
+        label = "Data entry method",
+        choices = c("Upload file" = "upload", "Create table" = "manual"),
+        selected = "upload",
+        inline = TRUE,
         width = "100%"
       ),
-      uiOutput("file_feedback"),
+      conditionalPanel(
+        condition = "input.custom_data_source === 'upload'",
+        fileInput(
+          inputId = "uploaded_file",
+          label = "Study data",
+          accept = c(".csv", ".xlsx", ".xls", ".txt", ".tsv"),
+          buttonLabel = "Choose file",
+          placeholder = "CSV, Excel, TSV, or TXT",
+          width = "100%"
+        ),
+        uiOutput("file_feedback")
+      ),
+      conditionalPanel(
+        condition = "input.custom_data_source === 'manual'",
+        div(
+          class = "manual-table-setup",
+          textInput(
+            inputId = "manual_column_names",
+            label = "Column names",
+            value = "treatment, block",
+            placeholder = "For example: treatment, block, subject, time",
+            width = "100%"
+          ),
+          numericInput(
+            inputId = "manual_row_count",
+            label = "Number of rows",
+            value = 12,
+            min = 1,
+            max = 1000,
+            step = 1,
+            width = "100%"
+          )
+        ),
+        actionButton(
+          inputId = "create_manual_table",
+          label = tagList(icon("table"), " Create table"),
+          class = "btn-primary",
+          width = "100%"
+        ),
+        uiOutput("manual_table_feedback"),
+        rhandsontable::rHandsontableOutput("custom_layout_table")
+      ),
       uiOutput("file_type_check")
     ))
   }
@@ -412,6 +453,14 @@ app_css <- "
   .field-with-help .form-group { min-width: 0; margin-bottom: 0; }
   .field-help-icon { color: var(--primary); cursor: pointer; }
   .design-settings .field-with-help + .field-note { margin-top: 8px; }
+  .manual-table-setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 10px;
+  }
+  .manual-table-feedback.validation-success,
+  .manual-table-feedback.validation-error { margin: 12px 0 10px; }
+  #custom_layout_table { margin-top: 10px; overflow-x: auto; }
 
   #dynamic_sidebar > .card,
   #dynamic_sidebar > .shiny-html-output > .card,
@@ -1042,7 +1091,7 @@ server<-function(input,output,session) {
     }else if(input$design_title=='General Design'){
       tagList(
         bslib::card(
-        section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your uploaded data."),
+        section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your design data."),
         
         div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
             div(style="flex:1;",
@@ -1376,6 +1425,13 @@ server<-function(input,output,session) {
       div(class = "validation-error", icon("triangle-exclamation"), " ", message)
     }
   })
+
+  datavalues <- reactiveValues(
+    uploaded_data = NULL,
+    manual_data = NULL,
+    manual_data_error = NULL,
+    custom_data = NULL
+  )
   
   observeEvent(input$uploaded_file, {
     req(page_started())
@@ -1393,6 +1449,99 @@ server<-function(input,output,session) {
     })
     if (is.null(df)) return(NULL)
     datavalues$uploaded_data <- df
+    if (identical(input$custom_data_source, "upload")) {
+      datavalues$custom_data <- df
+    }
+  })
+
+  observeEvent(input$create_manual_table, {
+    req(page_started(), input$design_title == "General Design")
+    table <- tryCatch(
+      new_manual_design_table(input$manual_column_names, input$manual_row_count),
+      error = function(error) {
+        datavalues$manual_data_error <- conditionMessage(error)
+        NULL
+      }
+    )
+    if (is.null(table)) return(NULL)
+
+    datavalues$manual_data <- table
+    datavalues$manual_data_error <- manual_design_data_error(table)
+    if (identical(input$custom_data_source, "manual")) {
+      datavalues$custom_data <- NULL
+    }
+  })
+
+  output$custom_layout_table <- rhandsontable::renderRHandsontable({
+    req(page_started(), datavalues$manual_data)
+    rhandsontable::rhandsontable(
+      datavalues$manual_data,
+      rowHeaders = TRUE,
+      colHeaders = names(datavalues$manual_data),
+      stretchH = "all",
+      height = min(300, 42 + 26 * nrow(datavalues$manual_data))
+    ) %>%
+      rhandsontable::hot_table(
+        contextMenu = TRUE,
+        highlightCol = TRUE,
+        highlightRow = TRUE
+      ) %>%
+      rhandsontable::hot_context_menu(allowRowEdit = TRUE, allowColEdit = FALSE)
+  })
+
+  observeEvent(input$custom_layout_table, {
+    table <- tryCatch(
+      as.data.frame(rhandsontable::hot_to_r(input$custom_layout_table), check.names = FALSE),
+      error = function(error) NULL
+    )
+    if (is.null(table)) return(NULL)
+
+    validation_error <- manual_design_data_error(table)
+    datavalues$manual_data_error <- validation_error
+    if (identical(input$custom_data_source, "manual")) {
+      datavalues$custom_data <- if (is.null(validation_error)) table else NULL
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$custom_data_source, {
+    req(page_started(), input$design_title == "General Design")
+    values$data <- NULL
+    values$variance <- NULL
+
+    if (identical(input$custom_data_source, "upload")) {
+      datavalues$custom_data <- datavalues$uploaded_data
+      return(NULL)
+    }
+
+    table <- tryCatch(
+      if (!is.null(input$custom_layout_table)) {
+        as.data.frame(rhandsontable::hot_to_r(input$custom_layout_table), check.names = FALSE)
+      } else {
+        datavalues$manual_data
+      },
+      error = function(error) datavalues$manual_data
+    )
+    validation_error <- manual_design_data_error(table)
+    datavalues$manual_data_error <- validation_error
+    datavalues$custom_data <- if (is.null(validation_error)) table else NULL
+  }, ignoreInit = TRUE)
+
+  output$manual_table_feedback <- renderUI({
+    req(page_started(), input$custom_data_source == "manual")
+    if (is.null(datavalues$manual_data)) {
+      return(field_note("Define the columns and row count, then create the editable table."))
+    }
+    if (!is.null(datavalues$manual_data_error)) {
+      return(div(
+        class = "validation-error manual-table-feedback",
+        icon("triangle-exclamation"), " ", datavalues$manual_data_error
+      ))
+    }
+    div(
+      class = "validation-success manual-table-feedback",
+      icon("circle-check"), " Table ready: ",
+      nrow(datavalues$custom_data), " rows and ", ncol(datavalues$custom_data), " columns."
+    )
   })
   
   observeEvent(input$design_title, {
@@ -1421,9 +1570,9 @@ server<-function(input,output,session) {
   
   output$file_type_check<-renderUI({
     req(page_started())
-    req(input$uploaded_file)
+    req(datavalues$custom_data)
     
-    cols <- colnames(datavalues$uploaded_data)
+    cols <- colnames(datavalues$custom_data)
     
     type_inputs <- lapply(seq_along(cols), function(i) {
       col_name <- cols[i]
@@ -1510,11 +1659,10 @@ server<-function(input,output,session) {
   
   level_nums <- reactive({
     req(page_started())
-    if (is.null(input$uploaded_file)|is.null(input$which_para)){
+    if (is.null(datavalues$custom_data) || is.null(input$which_para)){
       return(NULL)
     }else{
-      req(input$uploaded_file)
-      df <- datavalues$uploaded_data
+      df <- datavalues$custom_data
       factors <- unlist(strsplit(input$which_para, "\\:"))
       factors <- trimws(factors)
       
@@ -1524,7 +1672,7 @@ server<-function(input,output,session) {
         if (length(missing_cols) > 0) {
           div(
             style = "color: #d9534f; margin-top: 10px;",
-            paste("Use column names from the uploaded file. Not found:",
+            paste("Use column names from the design data. Not found:",
                   paste(missing_cols, collapse = ", "))
           )
         } else {
@@ -1547,10 +1695,6 @@ server<-function(input,output,session) {
     data = NULL,
     variance=NULL)
   
-  datavalues<-reactiveValues(
-    uploaded_data=NULL
-  )
-  
   observeEvent(input$design_title, {
     req(page_started())
     req(input$design_title)
@@ -1565,6 +1709,9 @@ server<-function(input,output,session) {
     req(input$design_title)
     if (input$design_title != "General Design") {
       datavalues$uploaded_data <- NULL
+      datavalues$manual_data <- NULL
+      datavalues$manual_data_error <- NULL
+      datavalues$custom_data <- NULL
     }
   })
   
@@ -1722,7 +1869,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -1907,7 +2054,7 @@ server<-function(input,output,session) {
     tryCatch(levels_vec_sub(), error = function(e) NULL),
     tryCatch(interaction_formula_number(), error = function(e) NULL),
     tryCatch(interaction_option_number(), error = function(e) NULL),
-    tryCatch(datavalues$uploaded_data, error = function(e) NULL),
+    tryCatch(datavalues$custom_data, error = function(e) NULL),
     tryCatch(input$Formula_general, error = function(e) NULL),
     tryCatch(factor_types_number(), error = function(e) NULL)
   )
@@ -1921,7 +2068,7 @@ server<-function(input,output,session) {
       req(input$level_numbers_main, input$level_numbers_sub)
     }
     if (input$design_title == 'General Design') {
-      req(input$uploaded_file)
+      req(datavalues$custom_data)
     }
     
     if(input$design_title=="Completely Randomized Design"){
@@ -2141,10 +2288,10 @@ server<-function(input,output,session) {
         values$variance<-as.matrix(df2)
       }
     }else if(input$design_title=="General Design"){
-      req(datavalues$uploaded_data)
+      req(datavalues$custom_data)
       #req(factor_types_number())
       tryCatch({
-        df<-datavalues$uploaded_data
+        df<-datavalues$custom_data
         cols <- colnames(df)
         types <- factor_types_number()
         
@@ -2211,7 +2358,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -2242,7 +2389,7 @@ server<-function(input,output,session) {
           "Enter the expected marginal mean at each level of every factor."
         } 
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
         note_text<-NULL
       }
       
@@ -2277,7 +2424,7 @@ server<-function(input,output,session) {
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       if (is.null(values$data)) {
         return(
@@ -2353,7 +2500,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -2368,7 +2515,7 @@ server<-function(input,output,session) {
         req(input$num_trt_sub)
         
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       
       bslib::card(
@@ -2393,7 +2540,7 @@ server<-function(input,output,session) {
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       if (is.null(values$variance)) {
         return(
@@ -2408,7 +2555,7 @@ server<-function(input,output,session) {
           rhandsontable::rHandsontableOutput("design_variance_table")
         }else if(input$design_title=="General Design"){
           if (!is.list(values$variance)) {
-            return(tags$em("Complete the uploaded-data model settings to create the variance tables."))
+            return(tags$em("Complete the custom-design model settings to create the variance tables."))
           }
           variance_list <- values$variance
           
@@ -2535,8 +2682,8 @@ server<-function(input,output,session) {
     
     if (input$cor_type == "none") return(NULL)
     
-    req(datavalues$uploaded_data)
-    cols <- colnames(datavalues$uploaded_data)
+    req(datavalues$custom_data)
+    cols <- colnames(datavalues$custom_data)
     
     var_sel <- function(id, lbl, extra_none = FALSE) {
       ch <- if (extra_none) c("None" = "", cols) else cols
@@ -2623,9 +2770,9 @@ server<-function(input,output,session) {
   # corSymm: lower-triangle table UI
   output$cor_symm_table_ui <- renderUI({
     req(page_started(), input$cor_type == "corSymm")
-    req(datavalues$uploaded_data, input$cor_time)
+    req(datavalues$custom_data, input$cor_time)
     
-    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- unique(datavalues$custom_data[[input$cor_time]])
     lev <- as.character(lev[!is.na(lev)])
     m   <- length(lev)
     
@@ -2641,9 +2788,9 @@ server<-function(input,output,session) {
   
   output$cor_symm_table <- rhandsontable::renderRHandsontable({
     req(page_started(), input$cor_type == "corSymm")
-    req(datavalues$uploaded_data, input$cor_time)
+    req(datavalues$custom_data, input$cor_time)
     
-    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- unique(datavalues$custom_data[[input$cor_time]])
     lev <- as.character(lev[!is.na(lev)])
     m   <- length(lev)
     req(m >= 2, m <= 15)
@@ -2678,9 +2825,9 @@ server<-function(input,output,session) {
   output$cor_validation_ui <- renderUI({
     req(page_started(), input$cor_type)
     if (input$cor_type == "none") return(NULL)
-    req(datavalues$uploaded_data)
+    req(datavalues$custom_data)
     
-    cols <- colnames(datavalues$uploaded_data)
+    cols <- colnames(datavalues$custom_data)
     msgs <- character(0)
     
     # Time / index variable check (for non-spatial types)
@@ -2689,31 +2836,31 @@ server<-function(input,output,session) {
       if (is.null(t) || !nzchar(t))
         msgs <- c(msgs, "Choose the column that defines time or observation order.")
       else if (!(t %in% cols))
-        msgs <- c(msgs, paste0("The selected time or sequence column is not in the uploaded data: ", t, "."))
+        msgs <- c(msgs, paste0("The selected time or sequence column is not in the design data: ", t, "."))
     }
     
     # Spatial coordinate checks
     if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
       x <- tryCatch(input$cor_x, error = function(e) NULL)
       if (is.null(x) || !(x %in% cols))
-        msgs <- c(msgs, "Choose an X-coordinate column from the uploaded data.")
+        msgs <- c(msgs, "Choose an X-coordinate column from the design data.")
       dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
       if (!is.null(dim_val) && dim_val >= "2") {
         y <- tryCatch(input$cor_y, error = function(e) NULL)
         if (is.null(y) || !(y %in% cols))
-          msgs <- c(msgs, "Choose a Y-coordinate column from the uploaded data.")
+          msgs <- c(msgs, "Choose a Y-coordinate column from the design data.")
       }
       if (!is.null(dim_val) && dim_val == "3") {
         z <- tryCatch(input$cor_z, error = function(e) NULL)
         if (is.null(z) || !(z %in% cols))
-          msgs <- c(msgs, "Choose a Z-coordinate column from the uploaded data.")
+          msgs <- c(msgs, "Choose a Z-coordinate column from the design data.")
       }
     }
     
     # Grouping variable (optional)
     grp <- tryCatch(input$cor_group, error = function(e) NULL)
     if (!is.null(grp) && nzchar(grp) && !(grp %in% cols))
-      msgs <- c(msgs, paste0("The selected grouping column is not in the uploaded data: ", grp, "."))
+      msgs <- c(msgs, paste0("The selected grouping column is not in the design data: ", grp, "."))
     
     # ARMA: p+q check
     if (input$cor_type == "corARMA") {
@@ -3013,8 +3160,7 @@ server<-function(input,output,session) {
           )
         )
       }else if(input$design_title=='General Design'){
-        #req(input$uploaded_file)
-        df<-if (!is.null(input$uploaded_file)) datavalues$uploaded_data else NULL
+        df <- datavalues$custom_data
         tagList(
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
@@ -3306,7 +3452,7 @@ server<-function(input,output,session) {
           )
         )
       }else if(input$design_title=='General Design'){
-        df<-if (!is.null(input$uploaded_file)) datavalues$uploaded_data else NULL
+        df <- datavalues$custom_data
         tagList(
           div(
             style = "flex: 1; padding-top: 2px;width:100%;",
@@ -3382,10 +3528,10 @@ server<-function(input,output,session) {
   
   output$by_validation <- renderUI({
     req(page_started())
-    if (is.null(input$uploaded_file) || is.null(input$by_para) || input$by_para == "") return(NULL)
+    if (is.null(datavalues$custom_data) || is.null(input$by_para) || input$by_para == "") return(NULL)
     if (toupper(input$by_para) == "NULL") return(NULL) 
     
-    df <- datavalues$uploaded_data
+    df <- datavalues$custom_data
     by_factors <- unlist(strsplit(input$by_para, "\\:"))
     by_factors <- trimws(by_factors)
     
@@ -3397,7 +3543,7 @@ server<-function(input,output,session) {
     
     msgs <- c()
     if (length(missing_cols) > 0) {
-      msgs <- c(msgs, paste0("Use column names from the uploaded data. Not found: ",
+      msgs <- c(msgs, paste0("Use column names from the design data. Not found: ",
                              paste(missing_cols, collapse = ", ")))
     }
     if (length(duplicated_factors) > 0) {
@@ -3543,8 +3689,8 @@ server<-function(input,output,session) {
   output$contrast_validation2 <- renderUI({
     req(page_started())
     req(input$custom_contrast, input$Contrast == 'Contrast vector')
-    req(datavalues$uploaded_data)
-    df <- datavalues$uploaded_data
+    req(datavalues$custom_data)
+    df <- datavalues$custom_data
     req(input$which_para)
     
     vec <- tryCatch({
@@ -3568,7 +3714,7 @@ server<-function(input,output,session) {
     missing_cols <- setdiff(factors, colnames(df))
     if (length(missing_cols) > 0) {
       return(tags$div(style = "color: red;", 
-                      paste("Use column names from the uploaded data. Not found:",
+                      paste("Use column names from the design data. Not found:",
                             paste(missing_cols, collapse = ", "))))
     }
     
@@ -3607,11 +3753,11 @@ server<-function(input,output,session) {
   
   output$level_numbers_validation3 <- renderUI({
     req(page_started())
-    req(datavalues$uploaded_data)
+    req(datavalues$custom_data)
     req(input$Formula_general)
     
     validation_error <- tryCatch({
-      validate_model_formula(input$Formula_general, datavalues$uploaded_data)
+      validate_model_formula(input$Formula_general, datavalues$custom_data)
       NULL
     }, error = function(error) conditionMessage(error))
     if (!is.null(validation_error)) {
@@ -3622,7 +3768,7 @@ server<-function(input,output,session) {
     }
     
     return(div(style = "color: #28a745; margin-top: 4px;",
-               "\u2713 Model formula is valid and all variables were found in the uploaded data."))
+               "\u2713 Model formula is valid and all variables were found in the design data."))
   })
 
   active_factor_count_error <- function() {
@@ -3918,8 +4064,8 @@ server<-function(input,output,session) {
           )
         }
       }else if(input$design_title=='General Design'){
-        req(input$uploaded_file, input$Formula_general)
-        df<-datavalues$uploaded_data
+        req(datavalues$custom_data, input$Formula_general)
+        df<-datavalues$custom_data
         
         cols <- colnames(df)
         types <- factor_types_number()
@@ -4375,7 +4521,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL),
       tryCatch(active_treatment_label_spec(), error = function(e) NULL),
       tryCatch(input$design_title,error=function(e) NULL)

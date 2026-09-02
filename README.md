@@ -59,7 +59,7 @@ The app supports power analysis for a variety of standard experimental designs a
 | **Randomized Complete Block Design (RCBD)** | Experimental units grouped into blocks to control for known sources of variability |
 | **Latin Square Design (LSD)** | Two blocking factors (rows and columns) to control two sources of variability; supports replicated squares with options to reuse row or column blocks |
 | **Split-Plot Design (SPD)** | Two levels of experimental units (main plots and sub-plots); supports multiple main-plot and sub-plot factors |
-| **General Design** | Upload your own data file to define a custom design using `lme4`/`nlme` model syntax |
+| **General Design** | Upload a data file or create an editable table to define a custom design using `lme4`/`nlme` model syntax |
 
 ## Features
 
@@ -71,7 +71,7 @@ The app supports power analysis for a variety of standard experimental designs a
 - **Variance input**: Specify variance components for each random effect (block, row, column, main-plot, error)
 - **F-test power**: Choose Type I, II, or III sums of squares and set the significance level
 - **t-test power**: Pairwise, treatment vs. control (`trt.vs.ctrl`), polynomial (`poly`), or custom contrast vectors; supports one-sided and two-sided alternatives; optional Bonferroni adjustment
-- **General Design mode**: Upload a data file (CSV, XLSX, XLS, TSV, TXT) and specify any `lme4::lmer`-compatible formula along with optional `nlme` residual correlation structures
+- **General Design mode**: Upload a data file (CSV, XLSX, XLS, TSV, TXT) or create and paste into an editable table, then specify any `lme4::lmer`-compatible formula along with optional `nlme` residual correlation structures
 - **Download results**: Export all power analysis results to a file
 
 ## Usage
@@ -86,7 +86,7 @@ Fill in the **Design** panel on the left:
 
 - **CRD / RCBD / LSD**: Set the number of treatment factors and their levels. For RCBD, enter the number of blocks. For LSD, set the number of replicated squares and the block-reuse option (`row`, `col`, or `none`).
 - **Split-Plot Design**: Set the number of main-plot factors and sub-plot factors, their levels, and the number of main-plot replicates per treatment.
-- **General Design**: Upload a data file and specify the model formula (e.g., `~ fA + fB + (1|block)`) and an optional residual correlation structure (e.g., `corAR1(value=0.6, form=~fA|fC)`).
+- **General Design**: Upload a data file or create an editable design table, then specify the model formula (e.g., `~ fA + fB + (1|block)`) and an optional residual correlation structure (e.g., `corAR1(value=0.6, form=~fA|fC)`).
 
 For standard designs, use **Treatment names** to replace generated labels such as `trt1` or `facA1` with the factor and level names used in your study. Enter one comma-separated level name for every configured level. These names appear consistently throughout the workflow and in exports; the underlying statistical model is unchanged.
 

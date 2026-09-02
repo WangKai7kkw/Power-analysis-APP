@@ -97,6 +97,68 @@ read_uploaded_data <- function(upload) {
   data
 }
 
+parse_manual_column_names <- function(value) {
+  if (is.null(value) || !nzchar(trimws(value))) {
+    stop("Enter at least one column name.", call. = FALSE)
+  }
+
+  columns <- trimws(strsplit(value, ",", fixed = TRUE)[[1]])
+  if (any(!nzchar(columns))) {
+    stop("Every column needs a name; remove extra commas or fill in the missing name.", call. = FALSE)
+  }
+  if (anyDuplicated(columns)) {
+    duplicated_names <- unique(columns[duplicated(columns)])
+    stop(
+      sprintf("Column names must be unique. Duplicated: %s.", paste(duplicated_names, collapse = ", ")),
+      call. = FALSE
+    )
+  }
+
+  columns
+}
+
+new_manual_design_table <- function(column_names, row_count, max_rows = 1000L) {
+  columns <- parse_manual_column_names(column_names)
+  rows <- suppressWarnings(as.numeric(as.character(row_count)))
+  if (
+    length(rows) != 1L || is.na(rows) || !is.finite(rows) ||
+    rows != floor(rows) || rows < 1L || rows > max_rows
+  ) {
+    stop(
+      sprintf("Choose a whole number of rows between 1 and %d.", max_rows),
+      call. = FALSE
+    )
+  }
+
+  table <- as.data.frame(
+    matrix("", nrow = as.integer(rows), ncol = length(columns)),
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  names(table) <- columns
+  table
+}
+
+manual_design_data_error <- function(data) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) < 1L || ncol(data) < 1L) {
+    return("Create a table with at least one row and one column.")
+  }
+  if (any(!nzchar(trimws(names(data)))) || anyDuplicated(names(data))) {
+    return("Use a unique, non-empty name for every column.")
+  }
+
+  empty_cells <- vapply(
+    data,
+    function(column) is.na(column) | !nzchar(trimws(as.character(column))),
+    logical(nrow(data))
+  )
+  if (any(empty_cells)) {
+    return("Fill every cell or remove unused rows before continuing.")
+  }
+
+  NULL
+}
+
 parse_custom_contrast <- function(value, expected_length = NULL, tolerance = 1e-10) {
   if (is.null(value) || !nzchar(trimws(value))) {
     stop("Enter contrast coefficients separated by commas, such as 1, -1.", call. = FALSE)
@@ -129,7 +191,7 @@ parse_custom_contrast <- function(value, expected_length = NULL, tolerance = 1e-
 
 validate_model_formula <- function(value, data) {
   if (is.null(value) || !nzchar(trimws(value))) {
-    stop("Enter a model formula using columns from the uploaded data.", call. = FALSE)
+    stop("Enter a model formula using columns from the design data.", call. = FALSE)
   }
   if (!grepl("^\\s*~", value)) {
     stop("The model formula must start with '~', for example ~ treatment + (1 | block).", call. = FALSE)
@@ -145,7 +207,7 @@ validate_model_formula <- function(value, data) {
   if (length(missing_variables)) {
     stop(
       sprintf(
-        "These variables were not found in the uploaded data: %s. Check spelling and capitalization.",
+        "These variables were not found in the design data: %s. Check spelling and capitalization.",
         paste(missing_variables, collapse = ", ")
       ),
       call. = FALSE
