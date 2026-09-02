@@ -32,15 +32,128 @@ panel_header <- function(step, eyebrow, title, description) {
     class = "panel-heading",
     div(class = "step-badge", step),
     div(
-      div(class = "panel-eyebrow", eyebrow),
+      if (!is.null(eyebrow)) div(class = "panel-eyebrow", eyebrow),
       tags$h2(title),
-      tags$p(description)
+      if (!is.null(description)) tags$p(description)
     )
   )
 }
 
 field_note <- function(...) {
   div(class = "field-note", icon("circle-info"), tags$span(...))
+}
+
+experimental_design_input <- function() {
+  selectInput(
+    inputId = "design_title",
+    label = "Choose the design",
+    choices = c(
+      "Completely randomized design (CRD)" = "Completely Randomized Design",
+      "Randomized complete block design (RCBD)" = "Randomized Complete Block Design",
+      "Latin square design" = "Latin Square Design",
+      "Split-plot design" = "Split Plot Design",
+      "Custom design" = "General Design"
+    ),
+    selected = "Completely Randomized Design",
+    width = "100%"
+  )
+}
+
+replication_settings_ui <- function(design_title) {
+  if (identical(design_title, "Completely Randomized Design")) {
+    return(tagList(
+      div(
+        class = "field-with-help",
+        numericInput(
+          "num_rep", "Replicates per treatment",
+          value = 8, min = 1, width = "100%"
+        ),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "In factorial designs, each combination of factor levels is treated as one treatment.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    ))
+  }
+
+  if (identical(design_title, "Randomized Complete Block Design")) {
+    return(tagList(
+      numericInput("num_block", "Number of blocks", value = 8, min = 1, width = "100%"),
+      field_note(
+        "The block size is fixed by the number of treatments because each block contains every treatment once. Use Custom design for incomplete blocks or multiple replicates of a treatment within each block."
+      )
+    ))
+  }
+
+  if (identical(design_title, "Latin Square Design")) {
+    return(tagList(
+      div(
+        class = "field-with-help",
+        numericInput("num_squares", "Number of squares", value = 4, min = 1, width = "100%"),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "For crossover designs, row and column blocks can represent subjects and time periods.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      field_note("The square size—the number of row and column blocks—is determined by the number of treatments."),
+      div(
+        class = "field-with-help",
+        selectInput(
+          inputId = "value_reuse",
+          label = "Reuse blocks across squares",
+          choices = c(
+            "Reuse row blocks" = "row",
+            "Reuse column blocks" = "col",
+            "Use new row and column blocks" = "none"
+          ),
+          selected = "none",
+          width = "100%"
+        ),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "Note: 'row' for reusing row blocks, 'col' for reusing column blocks, or 'none' for reusing neither row nor column blocks to replicate a single square.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    ))
+  }
+
+  if (identical(design_title, "Split Plot Design")) {
+    return(tagList(
+      numericInput(
+        "num_rep", "Whole plots per main treatment",
+        value = 10, min = 1, width = "100%"
+      )
+    ))
+  }
+
+  if (identical(design_title, "General Design")) {
+    return(tagList(
+      section_header(
+        "file-arrow-up", "Upload study layout",
+        "Upload a long-format design table with separate columns for treatment factors and all other design variables."
+      ),
+      fileInput(
+        inputId = "uploaded_file",
+        label = "Study data",
+        accept = c(".csv", ".xlsx", ".xls", ".txt", ".tsv"),
+        buttonLabel = "Choose file",
+        placeholder = "CSV, Excel, TSV, or TXT",
+        width = "100%"
+      ),
+      uiOutput("file_feedback"),
+      uiOutput("file_type_check")
+    ))
+  }
+
+  NULL
 }
 
 friendly_term_choices <- function(values, treatment_spec = NULL) {
@@ -191,39 +304,21 @@ app_css <- "
     color: var(--danger) !important;
   }
 
-  .design-selector-card {
-    display: grid;
-    grid-template-columns: minmax(260px, 1fr) minmax(340px, 620px);
-    align-items: end;
-    gap: 32px;
+  .app-intro-card {
     padding: 24px 26px;
     border: 1px solid #cfe0ff;
     border-radius: 18px;
     background: linear-gradient(120deg, #fff 20%, #eff6ff 100%);
     box-shadow: var(--shadow);
   }
-  .design-selector-card h1 {
+  .app-intro-card h1 {
     margin: 0 0 6px;
     font-size: clamp(26px, 2vw, 34px);
     line-height: 1.15;
     letter-spacing: -.035em;
     font-weight: 780;
   }
-  .design-selector-card p { margin: 0; max-width: 690px; color: var(--muted); }
-  .design-control { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: end; }
-  .design-control .form-group { margin-bottom: 0; }
-  .step-kicker {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 38px;
-    margin-bottom: 1px;
-    border-radius: 10px;
-    background: var(--primary);
-    color: #fff;
-    font-weight: 750;
-  }
+  .app-intro-card p { margin: 0; max-width: 760px; color: var(--muted); }
 
   .workflow-map {
     display: grid;
@@ -260,7 +355,7 @@ app_css <- "
     gap: 18px;
     align-items: start;
   }
-  .design-panel { grid-area: design; }
+  .design-panel { grid-area: design; display: grid; gap: 18px; }
   .test-panel { grid-area: test; }
   .results-panel { grid-area: results; }
 
@@ -299,6 +394,24 @@ app_css <- "
   .panel-heading p { margin: 0; color: var(--muted); font-size: 13px; font-weight: 400; }
   .panel-body { padding: 18px 20px 20px; }
   .panel-scroll { max-height: calc(100vh - 330px); overflow: auto; scrollbar-gutter: stable; }
+
+  .design-selection-card .panel-body { padding-bottom: 18px; }
+  .design-selection-card .form-group:last-child { margin-bottom: 0; }
+  .design-settings {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .design-settings .section-heading { margin-bottom: 13px; }
+  .field-with-help {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .field-with-help .form-group { min-width: 0; margin-bottom: 0; }
+  .field-help-icon { color: var(--primary); cursor: pointer; }
+  .design-settings .field-with-help + .field-note { margin-top: 8px; }
 
   #dynamic_sidebar > .card,
   #dynamic_sidebar > .shiny-html-output > .card,
@@ -474,7 +587,7 @@ app_css <- "
 
   @media (max-width: 860px) {
     .app-shell { padding: 16px 14px 26px; }
-    .design-selector-card { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+    .app-intro-card { padding: 20px; }
     .app-panels { grid-template-columns: 1fr; grid-template-areas: 'design' 'test' 'results'; }
     .workflow-map { grid-template-columns: repeat(2, 1fr); }
     .app-topbar { align-items: flex-start; }
@@ -486,8 +599,6 @@ app_css <- "
     .topbar-actions { width: 100%; }
     .topbar-actions > * { flex: 1 1 0; }
     .topbar-actions .btn { width: 100%; white-space: nowrap; font-size: 13px !important; }
-    .design-control { grid-template-columns: 1fr; }
-    .step-kicker { display: none; }
     .workflow-map { gap: 2px; }
     .workflow-map-item { padding: 8px 5px; font-size: 11px; }
     .workflow-card > .card-header, .panel-body { padding: 15px; }
@@ -556,28 +667,9 @@ server<-function(input,output,session) {
         )
       ),
       div(
-        class = "design-selector-card",
-        div(
-          tags$h1("Plan your power analysis"),
-          tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
-        ),
-        div(
-          class = "design-control",
-          div(class = "step-kicker", "1"),
-          selectInput(
-            inputId = "design_title",
-            label = "Experimental design",
-            choices = c(
-              "Completely randomized (CRD)" = "Completely Randomized Design",
-              "Randomized complete block (RCBD)" = "Randomized Complete Block Design",
-              "Latin square" = "Latin Square Design",
-              "Split-plot" = "Split Plot Design",
-              "Custom design from uploaded data" = "General Design"
-            ),
-            selected = "Completely Randomized Design",
-            width = '100%'
-          )
-        )
+        class = "app-intro-card",
+        tags$h1("Plan your power analysis"),
+        tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
       ),
       tags$nav(
         class = "workflow-map",
@@ -593,6 +685,15 @@ server<-function(input,output,session) {
         
         div(
           class = "app-panel design-panel",
+          card(
+            class = "workflow-card design-selection-card",
+            card_header(panel_header("1", NULL, "Experiment layout", NULL)),
+            div(
+              class = "panel-body",
+              experimental_design_input(),
+              div(class = "design-settings", uiOutput("replication_controls_ui"))
+            )
+          ),
           card(
             class = "workflow-card",
             card_header(panel_header("2", "Design assumptions", "Describe the study", "Set factor levels, sample size, expected means, and sources of variation.")),
@@ -787,6 +888,11 @@ server<-function(input,output,session) {
     all_terms <- c(all_factors, interaction_terms)
     return(all_terms)
   }
+
+  output$replication_controls_ui <- renderUI({
+    req(page_started(), input$design_title)
+    replication_settings_ui(input$design_title)
+  })
   
   output$dynamic_sidebar<-renderUI({
     req(page_started())
@@ -809,21 +915,6 @@ server<-function(input,output,session) {
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
-        
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("users", "Replication", "Set how many independent experimental units receive each treatment combination."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_rep", "Replicates per treatment combination",
-                               value = 8,min=1,width='100%')
-              )
-          )
-        ),
-        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -858,19 +949,6 @@ server<-function(input,output,session) {
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("table-cells-large", "Blocks", "Each complete block contains every treatment combination once."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_block", "Complete blocks", value = 8,min=1,width="100%")
-              )
-          )
-        ),
-        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -905,36 +983,6 @@ server<-function(input,output,session) {
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("border-all", "Square replication", "Set the number of squares and whether row or column blocks repeat across them."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_squares", "Replicated squares", value = 4,min=1,width = '100%')
-              )
-          ),
-          
-          div(
-            style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-            div(
-              style='flex:1;',
-              selectInput(
-                inputId = "value_reuse",
-                label = "Blocks reused across squares",
-                choices = c("Reuse row blocks" = 'row', "Reuse column blocks" = 'col', "Use new row and column blocks" = 'none'),
-                selected = "none",
-                width = "100%")
-            ),
-            tags$span(
-              `data-toggle` = "tooltip",
-              title = "Note: 'row' for reusing row blocks, 'col' for reusing column blocks, or 'none' for reusing neither row nor column blocks to replicate a single square.",
-              style = "margin-left: 5px; cursor: pointer;",
-              icon("question-circle")
-            )
-          )),
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -976,20 +1024,6 @@ server<-function(input,output,session) {
           uiOutput("treatment_names_ui"),
           uiOutput("treatment_names_validation")
         ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("users", "Whole-plot replication", "Set the number of independent whole plots assigned to each whole-plot treatment."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_rep", "Whole plots per whole-plot treatment",
-                               value = 10,min=1,width="100%")
-              )
-          )
-        ),
-        
         bslib::card(
           style = "background-color: #f8f9fa; border: 1px solid #ddd; 
                border-radius: 6px; padding: 2px; margin-top: 2px;",
@@ -1007,31 +1041,6 @@ server<-function(input,output,session) {
       )
     }else if(input$design_title=='General Design'){
       tagList(
-        bslib::card(
-        div(
-          style = "display: flex; flex-direction: column;width:100%;",
-          section_header("file-arrow-up", "Study layout", "Upload one row per observation or planned observation, with a separate column for each design variable.")
-        ),
-        
-        div(
-          style = "display: flex; align-items: center;width:100%;",
-          div(
-            style='flex:1;',
-            fileInput(
-              inputId = "uploaded_file",
-              label = "Study data",
-              accept = c(".csv", ".xlsx",".xls", ".txt", ".tsv"),
-              buttonLabel = "Choose file",
-              placeholder = "CSV, Excel, TSV, or TXT",
-              width = "100%")
-          )
-        ),
-        field_note("The app reads the column names from this file and uses them in the model and correlation settings."),
-        
-        uiOutput("file_feedback"),
-        
-        uiOutput("file_type_check")
-        ),
         bslib::card(
         section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your uploaded data."),
         

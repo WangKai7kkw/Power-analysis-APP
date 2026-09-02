@@ -78,7 +78,7 @@ The app supports power analysis for a variety of standard experimental designs a
 
 ### Step 1 – Select a Design
 
-Use the **Select Design** dropdown at the top to choose one of the five experimental designs.
+Use the **Choose the design** dropdown at the top of the left column to select one of the five experimental designs. The same card contains the relevant replication settings or the custom-layout upload.
 
 ### Step 2 – Configure the Design Panel
 

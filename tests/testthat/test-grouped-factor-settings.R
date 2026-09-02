@@ -26,6 +26,105 @@ test_that("the app header provides an accessible issue-reporting link", {
   })
 })
 
+test_that("design selection and replication controls are grouped in the left column", {
+  shiny::testServer(app_environment$server, {
+    main_html <- paste(as.character(output$main_ui), collapse = "\n")
+    selection_position <- regexpr("design-selection-card", main_html, fixed = TRUE)[[1]]
+    treatment_position <- regexpr("dynamic_sidebar", main_html, fixed = TRUE)[[1]]
+
+    expect_gt(selection_position, 0)
+    expect_gt(treatment_position, selection_position)
+    expect_match(main_html, 'id="design_title"', fixed = TRUE)
+    expect_match(main_html, "Experiment layout", fixed = TRUE)
+    expect_false(grepl("Select a design, then set its replication", main_html, fixed = TRUE))
+    expect_false(grepl("design-selector-card", main_html, fixed = TRUE))
+  })
+
+  selector_html <- paste(
+    as.character(app_environment$experimental_design_input()),
+    collapse = "\n"
+  )
+  expect_match(selector_html, "Choose the design", fixed = TRUE)
+  expect_match(selector_html, "Completely randomized design (CRD)", fixed = TRUE)
+  expect_match(selector_html, "Randomized complete block design (RCBD)", fixed = TRUE)
+  expect_match(selector_html, "Latin square design", fixed = TRUE)
+  expect_match(selector_html, "Split-plot design", fixed = TRUE)
+  expect_match(selector_html, ">Custom design<", fixed = TRUE)
+  expect_false(grepl("Custom design from uploaded data", selector_html, fixed = TRUE))
+
+  expected_controls <- list(
+    "Completely Randomized Design" = c("num_rep"),
+    "Randomized Complete Block Design" = c("num_block"),
+    "Latin Square Design" = c("num_squares", "value_reuse"),
+    "Split Plot Design" = c("num_rep"),
+    "General Design" = character()
+  )
+  all_replication_ids <- c("num_rep", "num_block", "num_squares", "value_reuse")
+
+  for (design_title in names(expected_controls)) {
+    settings_html <- paste(
+      as.character(app_environment$replication_settings_ui(design_title)),
+      collapse = "\n"
+    )
+    expected_ids <- expected_controls[[design_title]]
+
+    for (input_id in expected_ids) {
+      expect_match(settings_html, sprintf('id="%s"', input_id), fixed = TRUE)
+    }
+    for (input_id in setdiff(all_replication_ids, expected_ids)) {
+      expect_false(grepl(sprintf('id="%s"', input_id), settings_html, fixed = TRUE))
+    }
+  }
+
+  crd_html <- paste(
+    as.character(app_environment$replication_settings_ui("Completely Randomized Design")),
+    collapse = "\n"
+  )
+  expect_match(crd_html, "Replicates per treatment", fixed = TRUE)
+  expect_match(crd_html, "each combination of factor levels is treated as one treatment", fixed = TRUE)
+  expect_false(grepl(">Replication<", crd_html, fixed = TRUE))
+
+  rcbd_html <- paste(
+    as.character(app_environment$replication_settings_ui("Randomized Complete Block Design")),
+    collapse = "\n"
+  )
+  expect_match(rcbd_html, "Number of blocks", fixed = TRUE)
+  expect_match(rcbd_html, "The block size is fixed by the number of treatments", fixed = TRUE)
+  expect_match(rcbd_html, "incomplete blocks or multiple replicates", fixed = TRUE)
+
+  latin_html <- paste(
+    as.character(app_environment$replication_settings_ui("Latin Square Design")),
+    collapse = "\n"
+  )
+  expect_match(latin_html, "Number of squares", fixed = TRUE)
+  expect_match(latin_html, "square size—the number of row and column blocks—is determined", fixed = TRUE)
+  expect_match(latin_html, "row and column blocks can represent subjects and time periods", fixed = TRUE)
+
+  split_plot_html <- paste(
+    as.character(app_environment$replication_settings_ui("Split Plot Design")),
+    collapse = "\n"
+  )
+  expect_match(split_plot_html, "Whole plots per main treatment", fixed = TRUE)
+  expect_false(grepl("Whole-plot replication", split_plot_html, fixed = TRUE))
+
+  general_html <- paste(
+    as.character(app_environment$replication_settings_ui("General Design")),
+    collapse = "\n"
+  )
+  expect_match(general_html, "Upload study layout", fixed = TRUE)
+  expect_match(general_html, "Upload a long-format design table", fixed = TRUE)
+  expect_match(general_html, 'id="uploaded_file"', fixed = TRUE)
+  expect_false(grepl("The app reads the column names", general_html, fixed = TRUE))
+  expect_false(grepl("Replication is defined by the observation rows", general_html, fixed = TRUE))
+  expect_false(grepl("no separate replication field is needed", general_html, fixed = TRUE))
+  expect_match(app_environment$app_css, "@media (max-width: 860px)", fixed = TRUE)
+  expect_match(
+    app_environment$app_css,
+    "grid-template-areas: 'design' 'test' 'results'",
+    fixed = TRUE
+  )
+})
+
 test_that("grouped factor server state keeps display names separate from identifiers", {
   shiny::testServer(app_environment$server, {
     session$setInputs(
