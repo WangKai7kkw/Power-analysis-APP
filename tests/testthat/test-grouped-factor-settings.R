@@ -30,14 +30,36 @@ test_that("design selection and replication controls are grouped in the left col
   shiny::testServer(app_environment$server, {
     main_html <- paste(as.character(output$main_ui), collapse = "\n")
     selection_position <- regexpr("design-selection-card", main_html, fixed = TRUE)[[1]]
-    treatment_position <- regexpr("dynamic_sidebar", main_html, fixed = TRUE)[[1]]
+    treatment_position <- regexpr("treatment_structure_ui", main_html, fixed = TRUE)[[1]]
+    assumptions_position <- regexpr("dynamic_sidebar", main_html, fixed = TRUE)[[1]]
 
     expect_gt(selection_position, 0)
     expect_gt(treatment_position, selection_position)
+    expect_gt(assumptions_position, treatment_position)
     expect_match(main_html, 'id="design_title"', fixed = TRUE)
+    expect_match(main_html, "Design setup", fixed = TRUE)
+    expect_match(main_html, "Model assumptions", fixed = TRUE)
+    expect_match(main_html, "Test settings", fixed = TRUE)
+    expect_match(main_html, "Results &amp; export", fixed = TRUE)
     expect_match(main_html, "Experiment layout", fixed = TRUE)
+    expect_match(main_html, "Choose the experimental design, define replication", fixed = TRUE)
     expect_false(grepl("Select a design, then set its replication", main_html, fixed = TRUE))
     expect_false(grepl("design-selector-card", main_html, fixed = TRUE))
+
+    session$setInputs(
+      start_btn = 1,
+      design_title = "Completely Randomized Design",
+      num_trt = 1
+    )
+    session$flushReact()
+
+    structure_html <- paste(as.character(output$treatment_structure_ui), collapse = "\n")
+    assumptions_html <- paste(as.character(output$dynamic_sidebar), collapse = "\n")
+    expect_match(structure_html, "Treatment structure", fixed = TRUE)
+    expect_match(structure_html, 'id="num_trt"', fixed = TRUE)
+    expect_false(grepl("step-badge", structure_html, fixed = TRUE))
+    expect_match(assumptions_html, "Analysis model", fixed = TRUE)
+    expect_false(grepl("Treatment structure", assumptions_html, fixed = TRUE))
   })
 
   selector_html <- paste(

@@ -458,6 +458,7 @@ app_css <- "
     grid-template-columns: minmax(0, 1fr) 120px;
     gap: 10px;
   }
+  .design-settings .radio-inline + .radio-inline { margin-left: 18px; }
   .manual-table-feedback.validation-success,
   .manual-table-feedback.validation-error { margin: 12px 0 10px; }
   #manual_table_feedback > .field-note { margin-top: 10px; }
@@ -485,17 +486,28 @@ app_css <- "
     overflow-wrap: anywhere;
   }
   .column-role-row .form-group { min-width: 0; margin: 0; }
-
-  #dynamic_sidebar > .card,
-  #dynamic_sidebar > .shiny-html-output > .card,
-  #dynamic_sidebar .card {
-    margin: 0 0 14px !important;
-    padding: 16px !important;
-    height: auto !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 13px !important;
-    background: var(--surface-subtle) !important;
-    box-shadow: none !important;
+  .design-sections,
+  .assumption-sections { display: grid; gap: 14px; }
+  .workflow-section {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    background: var(--surface-subtle);
+  }
+  .workflow-section > :last-child { margin-bottom: 0; }
+  .table-scroll-region { max-height: 300px; overflow: auto; }
+  .table-placeholder {
+    min-height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 9px;
+    background: #fff;
+    color: var(--muted);
+    text-align: center;
   }
   .section-heading { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 13px; }
   .section-icon {
@@ -747,10 +759,10 @@ server<-function(input,output,session) {
       tags$nav(
         class = "workflow-map",
         `aria-label` = "Power analysis workflow",
-        div(class = "workflow-map-item", tags$span("1"), "Choose a design"),
-        div(class = "workflow-map-item", tags$span("2"), "Enter assumptions"),
-        div(class = "workflow-map-item", tags$span("3"), "Configure the test"),
-        div(class = "workflow-map-item", tags$span("4"), "Review & export")
+        div(class = "workflow-map-item", tags$span("1"), "Design setup"),
+        div(class = "workflow-map-item", tags$span("2"), "Model assumptions"),
+        div(class = "workflow-map-item", tags$span("3"), "Test settings"),
+        div(class = "workflow-map-item", tags$span("4"), "Results & export")
       ),
       
       div(
@@ -760,21 +772,37 @@ server<-function(input,output,session) {
           class = "app-panel design-panel",
           card(
             class = "workflow-card design-selection-card",
-            card_header(panel_header("1", NULL, "Experiment layout", NULL)),
+            card_header(panel_header(
+              "1", NULL, "Design setup",
+              "Choose the experimental design, define replication, and describe the treatment structure."
+            )),
             div(
               class = "panel-body",
-              experimental_design_input(),
-              div(class = "design-settings", uiOutput("replication_controls_ui"))
+              div(
+                class = "design-sections",
+                div(
+                  class = "workflow-section experiment-layout-section",
+                  section_header(
+                    "compass", "Experiment layout",
+                    "Choose the design and specify how experimental units are arranged or replicated."
+                  ),
+                  experimental_design_input(),
+                  div(class = "design-settings", uiOutput("replication_controls_ui"))
+                ),
+                uiOutput("treatment_structure_ui")
+              )
             )
           ),
           card(
             class = "workflow-card",
-            card_header(panel_header("2", "Design assumptions", "Describe the study", "Set factor levels, sample size, expected means, and sources of variation.")),
+            card_header(panel_header(
+              "2", NULL, "Model assumptions",
+              "Specify the analysis model, expected responses, and sources of variation."
+            )),
             div(
-              class = "panel-body panel-scroll",
+              class = "panel-body",
               uiOutput("dynamic_sidebar")
-            ),
-            full_screen = TRUE
+            )
           )
         ),
         
@@ -782,7 +810,10 @@ server<-function(input,output,session) {
           class = "app-panel test-panel",
           card(
             class = "workflow-card",
-            card_header(panel_header("3", "Analysis settings", "Choose what to test", "Use an overall F-test, focused contrasts, or both.")),
+            card_header(panel_header(
+              "3", NULL, "Test settings",
+              "Choose the effects or comparisons to test and define the testing criteria."
+            )),
             div(
               class = "panel-body panel-scroll",
               div(
@@ -809,7 +840,10 @@ server<-function(input,output,session) {
           class = "app-panel results-panel",
           card(
             class = "workflow-card",
-            card_header(panel_header("4", "Decision support", "Review the results", "Compare power across effects and download a record of the analysis.")),
+            card_header(panel_header(
+              "4", NULL, "Results & export",
+              "Review estimated power and download a record of the analysis."
+            )),
             div(
               class = "panel-body panel-scroll",
               uiOutput("results_display")
@@ -966,214 +1000,131 @@ server<-function(input,output,session) {
     req(page_started(), input$design_title)
     replication_settings_ui(input$design_title)
   })
-  
-  output$dynamic_sidebar<-renderUI({
-    req(page_started())
-    req(input$design_title)
-    if(input$design_title=='Completely Randomized Design'){
+
+  output$treatment_structure_ui <- renderUI({
+    req(page_started(), input$design_title)
+    if (input$design_title == "General Design") return(NULL)
+
+    description <- if (input$design_title == "Split Plot Design") {
+      "Separate factors applied to whole plots from those applied within plots."
+    } else if (input$design_title == "Latin Square Design") {
+      "Define the factors and levels arranged within each square."
+    } else {
+      "Define the factors and levels whose effects you want to detect."
+    }
+
+    factor_controls <- if (input$design_title == "Split Plot Design") {
       tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = '100%')
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
+        numericInput(
+          "num_trt_main", "Whole-plot factors",
+          value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+          step = 1, width = "100%"
         ),
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "Review the generated model and include interactions only when scientifically meaningful."),
-          
-          uiOutput('model_ui'),
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui')
-        ),
-        
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+        numericInput(
+          "num_trt_sub", "Subplot factors",
+          value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+          step = 1, width = "100%"
+        )
       )
-    }else if(input$design_title=='Randomized Complete Block Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
-          
-          div(style = "display: flex; align-items: center;width:100%;;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = "100%")
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
-        ),
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model includes a random intercept for block."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+    } else {
+      numericInput(
+        "num_trt", "Treatment factors",
+        value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+        step = 1, width = "100%"
       )
-    }else if(input$design_title=='Latin Square Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the treatments arranged within each square."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = "100%")
-              )
+    }
+
+    div(
+      class = "workflow-section treatment-structure-section",
+      section_header("layer-group", "Treatment structure", description),
+      factor_controls,
+      uiOutput("treatment_names_ui"),
+      uiOutput("treatment_names_validation")
+    )
+  })
+
+  output$dynamic_sidebar <- renderUI({
+    req(page_started(), input$design_title)
+
+    if (input$design_title == "General Design") {
+      analysis_model <- div(
+        class = "workflow-section",
+        section_header("code", "Analysis model", "Enter the model formula and any residual correlation using columns from the design data."),
+        div(
+          class = "field-with-help",
+          textInput(
+            "Formula_general", "Model formula",
+            placeholder = "For example: ~ treatment + time + (1 | subject)",
+            width = "100%"
           ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
+          tags$span(
+            `data-toggle` = "tooltip",
+            title = "Enter the right-hand side only, beginning with ~. Random effects follow lme4 syntax, such as (1 | block).",
+            class = "field-help-icon",
+            icon("question-circle")
+          )
         ),
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model includes random row and column effects."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-      )
-    }else if(input$design_title=='Split Plot Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Separate factors applied to whole plots from those applied within plots."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt_main", "Whole-plot factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width="100%")
-              )
-          ),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt_sub", "Subplot factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width="100%")
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
-        ),
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model accounts for whole-plot variation separately from residual error."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
-      )
-    }else if(input$design_title=='General Design'){
-      tagList(
-        bslib::card(
-        section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your design data."),
-        
-        div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
-            div(style="flex:1;",
-                textInput("Formula_general", "Model formula",
-                          placeholder = "For example: ~ treatment + time + (1 | subject)",width = "100%")
-            ),
-            tags$span(
-              `data-toggle` = "tooltip",
-              title = "Enter the right-hand side only, beginning with ~. Random effects follow lme4 syntax, such as (1 | block).",
-              style = "margin-left: 5px; cursor: pointer;",
-              icon("question-circle")
-            )
-        ),
-        
         uiOutput("level_numbers_validation3"),
-        
-        div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
-            div(style="flex:1;",
-                selectInput(
-                  "cor_type",
-                  "Within-group residual correlation",
-                  choices = c(
-                    "Independent residuals (none)" = "none",
-                    "AR(1): equally spaced repeated measures" = "corAR1",
-                    "ARMA: autoregressive moving average" = "corARMA",
-                    "Continuous AR(1): unequally spaced time" = "corCAR1",
-                    "Compound symmetry: constant correlation" = "corCompSymm",
-                    "Exponential spatial correlation" = "corExp",
-                    "Gaussian spatial correlation" = "corGaus",
-                    "Linear spatial correlation" = "corLin",
-                    "Unstructured correlation" = "corSymm",
-                    "Ratio-based spatial correlation" = "corRatio",
-                    "Spherical spatial correlation" = "corSpher"
-                  ),
-                  selected = "none",
-                  width = "100%"
-                )
+        div(
+          class = "field-with-help",
+          selectInput(
+            "cor_type",
+            "Within-group residual correlation",
+            choices = c(
+              "Independent residuals (none)" = "none",
+              "AR(1): equally spaced repeated measures" = "corAR1",
+              "ARMA: autoregressive moving average" = "corARMA",
+              "Continuous AR(1): unequally spaced time" = "corCAR1",
+              "Compound symmetry: constant correlation" = "corCompSymm",
+              "Exponential spatial correlation" = "corExp",
+              "Gaussian spatial correlation" = "corGaus",
+              "Linear spatial correlation" = "corLin",
+              "Unstructured correlation" = "corSymm",
+              "Ratio-based spatial correlation" = "corRatio",
+              "Spherical spatial correlation" = "corSpher"
             ),
-            tags$a(
-              href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
-              target = "_blank",
-              `data-toggle` = "tooltip",
-              `data-bs-html` = "true",
-              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",
-              style = "margin-left: 8px; color: #000; font-size: 18px;",
-              icon("question-circle")
-            )
+            selected = "none",
+            width = "100%"
+          ),
+          tags$a(
+            href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            `data-toggle` = "tooltip",
+            `data-bs-html` = "true",
+            `data-bs-title` = "Specifies residual correlation using nlme::corClasses. Click for documentation.",
+            class = "field-help-icon",
+            icon("question-circle")
+          )
         ),
         field_note("Leave this as independent residuals unless observations within a subject, plot, or location are expected to remain correlated."),
         uiOutput("cor_params_ui"),
         uiOutput("cor_validation_ui")
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+      )
+    } else {
+      model_description <- switch(
+        input$design_title,
+        "Randomized Complete Block Design" = "The generated model includes a random intercept for block.",
+        "Latin Square Design" = "The generated model includes random row and column effects.",
+        "Split Plot Design" = "The generated model accounts for whole-plot variation separately from residual error.",
+        "Review the generated model and include interactions only when scientifically meaningful."
+      )
+      analysis_model <- div(
+        class = "workflow-section",
+        section_header("diagram-project", "Analysis model", model_description),
+        uiOutput("interaction_exist_ui"),
+        uiOutput("interaction_fac_ui"),
+        uiOutput("model_ui")
       )
     }
+
+    div(
+      class = "assumption-sections",
+      analysis_model,
+      uiOutput("input_data_ui"),
+      uiOutput("input_variance_ui"),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    )
   })
   
   naming_row <- function(prefix, index, internal, level_count, scope_label, count_id) {
@@ -2422,20 +2373,16 @@ server<-function(input,output,session) {
       }
       
       if(input$design_title!='General Design'){
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-          section_header("table", "Expected responses", "Use values on the same scale as the outcome you plan to analyze."),
+        div(
+          class = "workflow-section",
+          section_header("table", "Expected responses", "Enter plausible outcome means under the alternative hypothesis."),
           tags$p(note_text, class = "field-note"),
           uiOutput('design_table_ui')
         )
       }else if(input$design_title=='General Design'){
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-          section_header("table", "Expected responses", "Enter the expected response for every model row generated from the uploaded design."),
+        div(
+          class = "workflow-section",
+          section_header("table", "Expected responses", "Enter plausible outcome means for every model row generated from the custom design."),
           tags$p("Use estimates from prior studies, pilot data, or the smallest effects that would be scientifically meaningful.", class = "field-note"),
           uiOutput('design_table_ui')
         )
@@ -2457,8 +2404,7 @@ server<-function(input,output,session) {
       if (is.null(values$data)) {
         return(
           div(
-            style = "height: 180px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
+            class = "table-placeholder",
             tags$em("Complete the treatment and model settings above to create the expected-response table.")
           )
         )
@@ -2495,7 +2441,7 @@ server<-function(input,output,session) {
         rowHeaders = row.names(df),
         colHeaders = colnames(df),
         stretchH = "all",
-        height = 180,
+        height = min(260, 42 + 26 * nrow(df)),
         colWidths = col_widths,
         rowHeaderWidth = row_name_width,
         digits = 2
@@ -2546,13 +2492,11 @@ server<-function(input,output,session) {
         req(datavalues$custom_data)
       }
       
-      bslib::card(
-        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                  border-radius: 8px; padding: 10px; margin-top: 8px;
-                  height: 240px; display: flex; flex-direction: column;",
-        section_header("wave-square", "Variation assumptions", "Enter variance estimates for each random effect and for residual error. Variances must be zero or greater."),
+      div(
+        class = "workflow-section",
+        section_header("wave-square", "Variation assumptions", "Enter variance estimates for random effects and residual error; values must be zero or greater."),
         div(
-          style = "flex: 0 0 auto; overflow-y: auto;",
+          class = "table-scroll-region",
           uiOutput('design_variance_table_ui')
         )
       )
@@ -2573,8 +2517,7 @@ server<-function(input,output,session) {
       if (is.null(values$variance)) {
         return(
           div(
-            style = "height: 100px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
+            class = "table-placeholder",
             tags$em("Complete the treatment and model settings above to create the variance table.")
           )
         )
@@ -2615,7 +2558,7 @@ server<-function(input,output,session) {
         rowHeaders = row.names(df),
         colHeaders = colnames(df),
         stretchH = "all",
-        height = 100,
+        height = min(220, 42 + 26 * nrow(df)),
         colWidths = col_widths,
         rowHeaderWidth = row_name_width,
         digits = 2
