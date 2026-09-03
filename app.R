@@ -59,6 +59,22 @@ experimental_design_input <- function() {
   )
 }
 
+design_family_for <- function(design_title) {
+  if (is.null(design_title) || length(design_title) != 1L || is.na(design_title)) {
+    return(NULL)
+  }
+  if (design_title %in% c(
+    "Completely Randomized Design",
+    "Randomized Complete Block Design",
+    "Latin Square Design"
+  )) {
+    return("standard")
+  }
+  if (identical(design_title, "Split Plot Design")) return("split_plot")
+  if (identical(design_title, "General Design")) return("custom")
+  NULL
+}
+
 replication_settings_ui <- function(design_title) {
   if (identical(design_title, "Completely Randomized Design")) {
     return(tagList(
@@ -364,20 +380,49 @@ app_css <- "
   .workflow-map {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    gap: 10px;
     margin: 16px 0;
   }
-  .workflow-map-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .workflow-step.btn {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 9px;
     min-width: 0;
-    padding: 10px 12px;
+    padding: 11px 12px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
     color: var(--muted);
-    font-size: 13px;
-    font-weight: 650;
+    text-align: left;
+    white-space: normal;
+    box-shadow: none;
   }
-  .workflow-map-item span {
+  .workflow-step.btn:hover,
+  .workflow-step.btn:focus-visible {
+    border-color: #c7d8f6;
+    background: #f8fbff;
+  }
+  .workflow-step.is-active {
+    border-color: #bcd3fb;
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 6px 18px rgba(23, 36, 61, .07);
+  }
+  .workflow-step:disabled { cursor: not-allowed; opacity: .58; }
+  .workflow-step-copy { display: grid; min-width: 0; }
+  .workflow-step-copy strong { color: inherit; font-size: 13px; line-height: 1.3; }
+  .workflow-step-copy small {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .workflow-step-number {
     display: grid;
     place-items: center;
     flex: 0 0 auto;
@@ -387,18 +432,70 @@ app_css <- "
     background: #e5edfa;
     color: #36506f;
     font-size: 12px;
+    font-weight: 800;
   }
+  .workflow-step.is-complete .workflow-step-number { background: #e8f7f0; color: var(--success); }
 
-  .app-panels {
+  .guided-workflow { min-width: 0; }
+  .guided-workflow > .tab-content > .tab-pane { outline: none; }
+  .workflow-stage { width: min(1040px, 100%); margin: 0 auto; }
+  .workflow-stage.test-stage { width: min(820px, 100%); }
+  .stage-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: #fbfcfe;
+  }
+  .stage-actions-copy { color: var(--muted); font-size: 12px; }
+  .stage-actions-buttons { display: flex; gap: 8px; margin-left: auto; }
+  .stage-actions .btn { min-height: 42px; border-radius: 9px; font-weight: 700; }
+  .stage-run-dock {
+    position: sticky;
+    bottom: 14px;
+    z-index: 10;
+    margin: 0 20px 20px;
+    padding: 12px;
+    border: 1px solid #bfd3f6;
+    border-radius: 13px;
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 12px 30px rgba(23, 36, 61, .16);
+    backdrop-filter: blur(8px);
+  }
+  .stage-run-dock .btn { width: 100%; }
+  .test-stage #create_result { display: none; }
+
+  .results-workspace {
     display: grid;
-    grid-template-columns: minmax(380px, 1.15fr) minmax(300px, .78fr) minmax(370px, 1.07fr);
-    grid-template-areas: 'design test results';
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
     gap: 18px;
     align-items: start;
   }
-  .design-panel { grid-area: design; display: grid; gap: 18px; }
-  .test-panel { grid-area: test; }
-  .results-panel { grid-area: results; }
+  .results-main { min-width: 0; }
+  .results-setup-sidebar { position: sticky; top: 16px; }
+  .setup-summary-card .card-header { padding: 16px 18px; }
+  .setup-summary-card .panel-body { padding: 16px 18px 18px; }
+  .analysis-setup-details > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: #263650;
+    font-size: 13px;
+    font-weight: 750;
+    list-style: none;
+  }
+  .analysis-setup-details > summary::-webkit-details-marker { display: none; }
+  .analysis-setup-details > summary::after { content: '+'; margin-left: auto; color: var(--primary); font-size: 18px; }
+  .analysis-setup-details[open] > summary::after { content: '−'; }
+  .analysis-summary-list { display: grid; gap: 10px; margin: 14px 0; }
+  .analysis-summary-item { padding: 10px 11px; border-radius: 9px; background: var(--surface-subtle); }
+  .analysis-summary-item span { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .analysis-summary-item strong { display: block; margin-top: 2px; color: #263650; font-size: 12px; line-height: 1.4; }
+  .summary-edit-actions { display: grid; gap: 8px; }
+  .summary-edit-actions .btn { width: 100%; text-align: left; }
 
   .workflow-card.card {
     overflow: hidden;
@@ -434,7 +531,8 @@ app_css <- "
   .panel-heading h2 { margin: 1px 0 2px; font-size: 19px; line-height: 1.25; font-weight: 750; }
   .panel-heading p { margin: 0; color: var(--muted); font-size: 13px; font-weight: 400; }
   .panel-body { padding: 18px 20px 20px; }
-  .panel-scroll { max-height: calc(100vh - 330px); overflow: auto; scrollbar-gutter: stable; }
+  .panel-scroll { overflow: visible; }
+  .results-main .panel-scroll { max-height: calc(100vh - 300px); overflow: auto; scrollbar-gutter: stable; }
 
   .design-selection-card .panel-body { padding-bottom: 18px; }
   .design-selection-card .form-group:last-child { margin-bottom: 0; }
@@ -662,18 +760,15 @@ app_css <- "
   .welcome-checklist i, .welcome-checklist svg { margin-top: 3px; color: var(--success); }
   .welcome-byline { margin: 18px 0 0; color: #7a879a; font-size: 12px; text-align: center; }
 
-  @media (max-width: 1280px) {
-    .app-panels {
-      grid-template-columns: minmax(420px, 1.1fr) minmax(330px, .9fr);
-      grid-template-areas: 'design test' 'design results';
-    }
-    .panel-scroll { max-height: none; }
+  @media (max-width: 900px) {
+    .results-workspace { grid-template-columns: 1fr; }
+    .results-setup-sidebar { position: static; }
+    .results-main .panel-scroll { max-height: none; overflow: visible; }
   }
 
   @media (max-width: 860px) {
     .app-shell { padding: 16px 14px 26px; }
     .app-intro-card { padding: 20px; }
-    .app-panels { grid-template-columns: 1fr; grid-template-areas: 'design' 'test' 'results'; }
     .workflow-map { grid-template-columns: repeat(2, 1fr); }
     .app-topbar { align-items: flex-start; }
   }
@@ -685,8 +780,13 @@ app_css <- "
     .topbar-actions > * { flex: 1 1 0; }
     .topbar-actions .btn { width: 100%; white-space: nowrap; font-size: 13px !important; }
     .workflow-map { gap: 2px; }
-    .workflow-map-item { padding: 8px 5px; font-size: 11px; }
+    .workflow-step.btn { padding: 8px 6px; }
+    .workflow-step-copy small { display: none; }
     .workflow-card > .card-header, .panel-body { padding: 15px; }
+    .stage-actions { align-items: stretch; flex-direction: column; padding: 14px 15px; }
+    .stage-actions-buttons { width: 100%; margin-left: 0; }
+    .stage-actions-buttons .btn { flex: 1 1 0; }
+    .stage-run-dock { margin: 0 15px 15px; }
     .welcome-modal { padding: 26px 22px 22px; }
     .naming-row { grid-template-columns: 1fr; }
     .naming-row-title, .factor-feedback { grid-column: 1; }
@@ -706,7 +806,20 @@ server<-function(input,output,session) {
   
   page_started <- reactiveVal(FALSE)
   results_generated <- reactiveVal(FALSE)
+  results_seen <- reactiveVal(FALSE)
+  furthest_step <- reactiveVal(1L)
   design_revision <- reactiveVal(0L)
+  design_family <- reactiveVal(NULL)
+  standard_means_cache <- reactiveVal(NULL)
+
+  observeEvent(input$design_title, {
+    next_family <- design_family_for(input$design_title)
+    previous_family <- isolate(design_family())
+    if (!identical(next_family, previous_family)) {
+      standard_means_cache(NULL)
+      design_family(next_family)
+    }
+  }, ignoreNULL = FALSE, priority = 1000)
   
   ui_main<-function(){
     div(
@@ -756,20 +869,18 @@ server<-function(input,output,session) {
         tags$h1("Plan your power analysis"),
         tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
       ),
-      tags$nav(
-        class = "workflow-map",
-        `aria-label` = "Power analysis workflow",
-        div(class = "workflow-map-item", tags$span("1"), "Design setup"),
-        div(class = "workflow-map-item", tags$span("2"), "Model assumptions"),
-        div(class = "workflow-map-item", tags$span("3"), "Test settings"),
-        div(class = "workflow-map-item", tags$span("4"), "Results & export")
-      ),
-      
+      uiOutput("workflow_navigation"),
+
       div(
-        class = "app-panels",
-        
-        div(
-          class = "app-panel design-panel",
+        class = "guided-workflow",
+        navset_hidden(
+          id = "workflow_stage",
+          selected = "design",
+        nav_panel(
+          "Design setup",
+          value = "design",
+          div(
+            class = "workflow-stage design-stage",
           card(
             class = "workflow-card design-selection-card",
             card_header(panel_header(
@@ -791,8 +902,27 @@ server<-function(input,output,session) {
                 ),
                 uiOutput("treatment_structure_ui")
               )
+            ),
+            div(
+              class = "stage-actions",
+              div(class = "stage-actions-copy", "Next: define the model and expected response."),
+              div(
+                class = "stage-actions-buttons",
+                actionButton(
+                  "continue_to_assumptions",
+                  tagList("Continue to assumptions ", icon("arrow-right")),
+                  class = "btn-primary"
+                )
+              )
             )
-          ),
+          )
+          )
+        ),
+        nav_panel(
+          "Model assumptions",
+          value = "assumptions",
+          div(
+            class = "workflow-stage assumptions-stage",
           card(
             class = "workflow-card",
             card_header(panel_header(
@@ -802,12 +932,28 @@ server<-function(input,output,session) {
             div(
               class = "panel-body",
               uiOutput("dynamic_sidebar")
+            ),
+            div(
+              class = "stage-actions",
+              div(class = "stage-actions-copy", "Next: choose the effects and testing criteria."),
+              div(
+                class = "stage-actions-buttons",
+                actionButton("back_to_design", tagList(icon("arrow-left"), " Design"), class = "btn-light"),
+                actionButton(
+                  "continue_to_tests",
+                  tagList("Continue to tests ", icon("arrow-right")),
+                  class = "btn-primary"
+                )
+              )
             )
           )
+          )
         ),
-        
-        div(
-          class = "app-panel test-panel",
+        nav_panel(
+          "Test settings",
+          value = "tests",
+          div(
+            class = "workflow-stage test-stage",
           card(
             class = "workflow-card",
             card_header(panel_header(
@@ -832,29 +978,74 @@ server<-function(input,output,session) {
               ),
               uiOutput('test_options_ui')
             ),
+            div(
+              class = "stage-run-dock",
+              actionButton(
+                "run_analysis",
+                tagList(icon("calculator"), " Run power analysis"),
+                class = "btn-primary"
+              )
+            ),
+            div(
+              class = "stage-actions",
+              div(class = "stage-actions-copy", "Review assumptions at any time using the workflow summary above."),
+              div(
+                class = "stage-actions-buttons",
+                actionButton("back_to_assumptions", tagList(icon("arrow-left"), " Assumptions"), class = "btn-light")
+              )
+            ),
             full_screen = TRUE
+          )
           )
         ),
-        
-        div(
-          class = "app-panel results-panel",
-          card(
-            class = "workflow-card",
-            card_header(panel_header(
-              "4", NULL, "Results & export",
-              "Review estimated power and download a record of the analysis."
-            )),
+        nav_panel(
+          "Results & export",
+          value = "results",
+          div(
+            class = "results-workspace",
             div(
-              class = "panel-body panel-scroll",
-              uiOutput("results_display")
+              class = "results-main",
+              card(
+                class = "workflow-card",
+                card_header(panel_header(
+                  "4", NULL, "Results & export",
+                  "Review estimated power and download a record of the analysis."
+                )),
+                div(
+                  class = "panel-body panel-scroll",
+                  uiOutput("results_display")
+                ),
+                div(
+                  class = "panel-body download-area",
+                  uiOutput("download_actions")
+                ),
+                full_screen = TRUE
+              )
             ),
-            div(
-              class = "panel-body download-area",
-              uiOutput("download_actions")
-            ),
-            full_screen = TRUE
+            tags$aside(
+              class = "results-setup-sidebar",
+              card(
+                class = "workflow-card setup-summary-card",
+                card_header(tags$h3("Analysis setup", style = "margin: 0; font-size: 16px;")),
+                div(
+                  class = "panel-body",
+                  tags$details(
+                    class = "analysis-setup-details",
+                    tags$summary(icon("sliders"), "View or edit assumptions"),
+                    uiOutput("analysis_setup_summary"),
+                    div(
+                      class = "summary-edit-actions",
+                      actionButton("edit_design_from_results", tagList(icon("pen"), " Edit design"), class = "btn-light"),
+                      actionButton("edit_assumptions_from_results", tagList(icon("pen"), " Edit assumptions"), class = "btn-light"),
+                      actionButton("edit_tests_from_results", tagList(icon("pen"), " Edit test settings"), class = "btn-light")
+                    )
+                  )
+                )
+              )
+            )
           )
         )
+      )
       )
     )
   }
@@ -862,6 +1053,145 @@ server<-function(input,output,session) {
   output$main_ui <- renderUI({
     ui_main()
   })
+
+  active_stage <- reactive({
+    stage <- input$workflow_stage
+    if (is.null(stage) || !nzchar(stage)) "design" else stage
+  })
+
+  design_summary <- reactive({
+    design <- input$design_title
+    if (length(design) != 1L || is.na(design) || !nzchar(design)) return("Choose an experimental design")
+
+    design_label <- switch(
+      design,
+      "Completely Randomized Design" = "CRD",
+      "Randomized Complete Block Design" = "RCBD",
+      "Latin Square Design" = "Latin square",
+      "Split Plot Design" = "Split plot",
+      "General Design" = "Custom design",
+      design
+    )
+    replication <- switch(
+      design,
+      "Completely Randomized Design" = if (!is.null(input$num_rep)) paste(input$num_rep, "replicates") else NULL,
+      "Randomized Complete Block Design" = if (!is.null(input$num_block)) paste(input$num_block, "blocks") else NULL,
+      "Latin Square Design" = if (!is.null(input$num_squares)) paste(input$num_squares, "squares") else NULL,
+      "Split Plot Design" = if (!is.null(input$num_rep)) paste(input$num_rep, "whole plots") else NULL,
+      NULL
+    )
+    factor_count <- if (identical(design, "Split Plot Design")) {
+      counts <- c(input$num_trt_main, input$num_trt_sub)
+      if (length(counts) && all(is.finite(as.numeric(counts)))) paste(sum(as.numeric(counts)), "factors") else NULL
+    } else if (!identical(design, "General Design") && !is.null(input$num_trt)) {
+      paste(input$num_trt, if (identical(as.numeric(input$num_trt), 1)) "factor" else "factors")
+    }
+    paste(Filter(function(value) !is.null(value) && nzchar(value), c(design_label, factor_count, replication)), collapse = " · ")
+  })
+
+  assumptions_summary <- reactive({
+    if (identical(input$design_title, "General Design")) {
+      formula <- input$Formula_general
+      if (is.null(formula) || !nzchar(trimws(formula))) "Custom model not yet specified" else paste("Model", trimws(formula))
+    } else {
+      interaction_note <- if (!is.null(input$interaction_option) && identical(input$interaction_option, "Yes")) {
+        "with interactions"
+      } else {
+        "main effects"
+      }
+      paste("Generated mixed model", interaction_note, sep = " · ")
+    }
+  })
+
+  tests_summary <- reactive({
+    test_type <- input$Type
+    if (length(test_type) != 1L || is.na(test_type)) test_type <- ""
+    type_label <- switch(
+      test_type,
+      "F-test" = "Overall effects",
+      "t-test" = "Specific comparisons",
+      "F-test & t-test" = "Effects and comparisons",
+      "Choose test settings"
+    )
+    alpha <- if (identical(test_type, "t-test")) input$p_value2 else input$p_value1
+    if (length(alpha) != 1L || is.na(alpha)) type_label else paste0(type_label, " · α = ", format(alpha, trim = TRUE))
+  })
+
+  go_to_stage <- function(stage, step_number) {
+    furthest_step(max(isolate(furthest_step()), step_number))
+    nav_select("workflow_stage", selected = stage, session = session)
+  }
+
+  output$workflow_navigation <- renderUI({
+    stages <- c("design", "assumptions", "tests", "results")
+    titles <- c("Design setup", "Model assumptions", "Test settings", "Results & export")
+    summaries <- c(
+      design_summary(),
+      assumptions_summary(),
+      tests_summary(),
+      if (results_generated()) {
+        "Power results ready"
+      } else if (results_seen()) {
+        "Assumptions changed · rerun needed"
+      } else {
+        "Available after running"
+      }
+    )
+    current <- active_stage()
+
+    tags$nav(
+      class = "workflow-map",
+      `aria-label` = "Power analysis workflow",
+      lapply(seq_along(stages), function(index) {
+        is_disabled <- identical(stages[[index]], "results") && !results_seen() && !identical(current, "results")
+        classes <- c(
+          "workflow-step",
+          if (identical(current, stages[[index]])) "is-active",
+          if (index < furthest_step() || (index == 4L && results_seen())) "is-complete"
+        )
+        button <- actionButton(
+          paste0("workflow_step_", index),
+          label = tagList(
+            tags$span(class = "workflow-step-number", index),
+            tags$span(
+              class = "workflow-step-copy",
+              tags$strong(titles[[index]]),
+              tags$small(summaries[[index]])
+            )
+          ),
+          class = paste(classes, collapse = " ")
+        )
+        if (is_disabled) {
+          htmltools::tagAppendAttributes(button, disabled = "disabled", `aria-disabled` = "true")
+        } else {
+          button
+        }
+      })
+    )
+  })
+
+  output$analysis_setup_summary <- renderUI({
+    div(
+      class = "analysis-summary-list",
+      div(class = "analysis-summary-item", tags$span("Design"), tags$strong(design_summary())),
+      div(class = "analysis-summary-item", tags$span("Assumptions"), tags$strong(assumptions_summary())),
+      div(class = "analysis-summary-item", tags$span("Tests"), tags$strong(tests_summary()))
+    )
+  })
+
+  observeEvent(input$workflow_step_1, go_to_stage("design", 1L))
+  observeEvent(input$workflow_step_2, go_to_stage("assumptions", 2L))
+  observeEvent(input$workflow_step_3, go_to_stage("tests", 3L))
+  observeEvent(input$workflow_step_4, {
+    if (results_seen()) go_to_stage("results", 4L)
+  })
+  observeEvent(input$continue_to_assumptions, go_to_stage("assumptions", 2L))
+  observeEvent(input$back_to_design, go_to_stage("design", 1L))
+  observeEvent(input$continue_to_tests, go_to_stage("tests", 3L))
+  observeEvent(input$back_to_assumptions, go_to_stage("assumptions", 2L))
+  observeEvent(input$edit_design_from_results, go_to_stage("design", 1L))
+  observeEvent(input$edit_assumptions_from_results, go_to_stage("assumptions", 2L))
+  observeEvent(input$edit_tests_from_results, go_to_stage("tests", 3L))
 
   output$download_actions <- renderUI({
     if (isTRUE(results_generated())) {
@@ -1002,18 +1332,16 @@ server<-function(input,output,session) {
   })
 
   output$treatment_structure_ui <- renderUI({
-    req(page_started(), input$design_title)
-    if (input$design_title == "General Design") return(NULL)
+    req(page_started(), design_family())
+    if (design_family() == "custom") return(NULL)
 
-    description <- if (input$design_title == "Split Plot Design") {
+    description <- if (design_family() == "split_plot") {
       "Separate factors applied to whole plots from those applied within plots."
-    } else if (input$design_title == "Latin Square Design") {
-      "Define the factors and levels arranged within each square."
     } else {
       "Define the factors and levels whose effects you want to detect."
     }
 
-    factor_controls <- if (input$design_title == "Split Plot Design") {
+    factor_controls <- if (design_family() == "split_plot") {
       tagList(
         numericInput(
           "num_trt_main", "Whole-plot factors",
@@ -1044,9 +1372,9 @@ server<-function(input,output,session) {
   })
 
   output$dynamic_sidebar <- renderUI({
-    req(page_started(), input$design_title)
+    req(page_started(), design_family())
 
-    if (input$design_title == "General Design") {
+    if (design_family() == "custom") {
       analysis_model <- div(
         class = "workflow-section",
         section_header("code", "Analysis model", "Enter the model formula and any residual correlation using columns from the design data."),
@@ -1102,13 +1430,11 @@ server<-function(input,output,session) {
         uiOutput("cor_validation_ui")
       )
     } else {
-      model_description <- switch(
-        input$design_title,
-        "Randomized Complete Block Design" = "The generated model includes a random intercept for block.",
-        "Latin Square Design" = "The generated model includes random row and column effects.",
-        "Split Plot Design" = "The generated model accounts for whole-plot variation separately from residual error.",
+      model_description <- if (design_family() == "split_plot") {
+        "The generated model accounts for whole-plot variation separately from residual error."
+      } else {
         "Review the generated model and include interactions only when scientifically meaningful."
-      )
+      }
       analysis_model <- div(
         class = "workflow-section",
         section_header("diagram-project", "Analysis model", model_description),
@@ -1175,10 +1501,10 @@ server<-function(input,output,session) {
   }
 
   output$treatment_names_ui <- renderUI({
-    req(page_started(), input$design_title)
-    if (input$design_title == "General Design") return(NULL)
+    req(page_started(), design_family())
+    if (design_family() == "custom") return(NULL)
 
-    if (input$design_title == "Split Plot Design") {
+    if (design_family() == "split_plot") {
       req(input$num_trt_main, input$num_trt_sub)
       main_result <- factor_count_result(input$num_trt_main)
       sub_result <- factor_count_result(input$num_trt_sub)
@@ -1268,8 +1594,8 @@ server<-function(input,output,session) {
   })
 
   observe({
-    req(page_started(), input$design_title != "General Design")
-    if (input$design_title == "Split Plot Design") {
+    req(page_started(), design_family() != "custom")
+    if (design_family() == "split_plot") {
       req(input$num_trt_main, input$num_trt_sub)
       main_result <- factor_count_result(input$num_trt_main)
       sub_result <- factor_count_result(input$num_trt_sub)
@@ -1291,10 +1617,10 @@ server<-function(input,output,session) {
   })
 
   active_treatment_label_spec <- reactive({
-    req(page_started(), input$design_title)
-    if (input$design_title == "General Design") return(list())
+    req(page_started(), design_family())
+    if (design_family() == "custom") return(list())
 
-    if (input$design_title == "Split Plot Design") {
+    if (design_family() == "split_plot") {
       req(input$num_trt_main, input$num_trt_sub)
       main_result <- factor_count_result(input$num_trt_main)
       sub_result <- factor_count_result(input$num_trt_sub)
@@ -1368,20 +1694,20 @@ server<-function(input,output,session) {
     local({
       i <- index
       output[[paste0("treatment_factor_feedback_", i)]] <- renderUI({
-        req(input$design_title != "Split Plot Design")
+        req(design_family() == "standard")
         spec <- active_treatment_label_spec()
         req(i <= length(spec))
         factor_feedback(spec[[i]], spec)
       })
       output[[paste0("main_factor_feedback_", i)]] <- renderUI({
-        req(input$design_title == "Split Plot Design")
+        req(design_family() == "split_plot")
         spec <- active_treatment_label_spec()
         main_count <- validate_factor_count(input$num_trt_main)
         req(i <= main_count, i <= length(spec))
         factor_feedback(spec[[i]], spec)
       })
       output[[paste0("sub_factor_feedback_", i)]] <- renderUI({
-        req(input$design_title == "Split Plot Design")
+        req(design_family() == "split_plot")
         spec <- active_treatment_label_spec()
         main_count <- validate_factor_count(input$num_trt_main)
         req(i <= validate_factor_count(input$num_trt_sub), main_count + i <= length(spec))
@@ -1391,7 +1717,7 @@ server<-function(input,output,session) {
   }
 
   output$treatment_names_validation <- renderUI({
-    req(page_started(), input$design_title != "General Design")
+    req(page_started(), design_family() != "custom")
     spec <- active_treatment_label_spec()
     message <- validate_treatment_label_spec(spec)
     if (is.null(message)) {
@@ -1616,25 +1942,26 @@ server<-function(input,output,session) {
     return(types)
   })
   
-  observeEvent(input$design_title, {
+  observeEvent(design_family(), {
     req(page_started())
-    req(input$design_title)
-    resetInput <- function(id) {
-      if (id %in% names(input)) {
-        tryCatch({
-          updateTextInput(session, id, value = "")
-        }, error = function(e) {
-          tryCatch({
-            updateSelectInput(session, id, selected = character(0))
-          }, error = function(e2) {})
-        })
+    next_family <- design_family()
+    session$onFlushed(function() {
+      updateSelectInput(session, "Type", selected = "F-test")
+      updateSelectInput(session, "Type_ss", selected = "Type III")
+      updateSliderInput(session, "p_value1", value = 0.05)
+      updateSliderInput(session, "p_value2", value = 0.05)
+      updateSelectInput(session, "alternative", selected = "two.sided")
+      updateCheckboxInput(session, "p.adj", value = FALSE)
+      updateSelectInput(session, "Contrast", selected = "pairwise")
+      if (identical(next_family, "custom")) {
+        updateTextInput(session, "which_para", value = "")
+        updateTextInput(session, "by_para", value = "")
+      } else {
+        updateSelectInput(session, "which_para", selected = character(0))
+        updateSelectInput(session, "by_para", selected = "NULL")
       }
-    }
-    
-    resetInput("which_para")
-    resetInput("by_para")
-    resetInput("Contrast")
-  })
+    }, once = TRUE)
+  }, ignoreInit = TRUE)
   
   level_nums <- reactive({
     req(page_started())
@@ -1673,6 +2000,28 @@ server<-function(input,output,session) {
   values<-reactiveValues(
     data = NULL,
     variance=NULL)
+
+  observeEvent(input$design_table, {
+    req(design_family() == "standard")
+    current <- tryCatch(
+      as.data.frame(rhandsontable::hot_to_r(input$design_table)),
+      error = function(error) NULL
+    )
+    if (!is.null(current)) standard_means_cache(as.matrix(current))
+  }, ignoreNULL = TRUE)
+
+  restore_standard_means <- function(template) {
+    cached <- isolate(standard_means_cache())
+    current <- tryCatch({
+      table <- isolate(input$design_table)
+      if (is.null(table)) NULL else as.matrix(rhandsontable::hot_to_r(table))
+    }, error = function(error) NULL)
+    source <- current %||% cached
+    if (is.null(source) || !identical(dim(source), dim(template))) return(template)
+    restored <- template
+    restored[,] <- source
+    restored
+  }
   
   observeEvent(input$design_title, {
     req(page_started())
@@ -1695,8 +2044,8 @@ server<-function(input,output,session) {
   })
   
   output$interaction_exist_ui <- renderUI({
-    req(page_started())
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
+    req(page_started(), design_family())
+    if(design_family() == "standard"){
       req(!is.null(input$num_trt))
       count_result <- factor_count_result(input$num_trt)
       if (is.null(count_result$value)) {
@@ -1718,7 +2067,7 @@ server<-function(input,output,session) {
           )
         )
       }
-    }else if(input$design_title=='Split Plot Design'){
+    }else if(design_family() == "split_plot"){
       req(!is.null(input$num_trt_main), !is.null(input$num_trt_sub))
       main_result <- factor_count_result(input$num_trt_main)
       sub_result <- factor_count_result(input$num_trt_sub)
@@ -1751,12 +2100,12 @@ server<-function(input,output,session) {
   })
   
   output$interaction_fac_ui <- renderUI({
-    req(page_started())
+    req(page_started(), design_family())
     req(input$interaction_option)
     if (input$interaction_option == "No") {
       return(NULL)
     }
-    if(!input$design_title%in%c('Split Plot Design','General Design')){
+    if(design_family() == "standard"){
       factor_count <- levels_num_trt()
       if(factor_count>1){
         fac_names <- paste0("fac", LETTERS[seq_len(factor_count)])
@@ -1787,7 +2136,7 @@ server<-function(input,output,session) {
       }else{
         NULL
       }
-    }else if(input$design_title=='Split Plot Design'){
+    }else if(design_family() == "split_plot"){
       num_trt_main <- levels_num_trt_main()
       num_trt_sub <- levels_num_trt_sub()
       req(num_trt_main + num_trt_sub <= MAX_TREATMENT_FACTORS)
@@ -1835,10 +2184,9 @@ server<-function(input,output,session) {
   
   observeEvent({
     list(
-      tryCatch(input$design_title,error=function(e) NULL),
+      tryCatch(design_family(),error=function(e) NULL),
       tryCatch(levels_vec(), error = function(e) NULL),
       tryCatch(levels_num_trt(), error = function(e) NULL),
-      tryCatch(input$num_rep, error = function(e) NULL),
       tryCatch(interaction_option_number(), error = function(e) NULL),
       tryCatch(interaction_formula_number(), error = function(e) NULL),
       
@@ -2028,6 +2376,10 @@ server<-function(input,output,session) {
   
   observeEvent({list(
     design_revision(),
+    tryCatch(input$num_rep, error = function(e) NULL),
+    tryCatch(input$num_block, error = function(e) NULL),
+    tryCatch(input$num_squares, error = function(e) NULL),
+    tryCatch(input$value_reuse, error = function(e) NULL),
     tryCatch(levels_vec(), error = function(e) NULL),
     tryCatch(levels_vec_main(), error = function(e) NULL),
     tryCatch(levels_vec_sub(), error = function(e) NULL),
@@ -2095,7 +2447,7 @@ server<-function(input,output,session) {
         }
         df<-data.frame(Mean = crd$fixeff$means)
         df[]<-' '
-        values$data<-as.matrix(df)
+        values$data <- restore_standard_means(as.matrix(df))
         df2<-data.frame(Variance=1)
         df2[]<-' '
         row.names(df2)<-'Error'
@@ -2146,7 +2498,7 @@ server<-function(input,output,session) {
         }
         df<-data.frame(Mean = crd$fixeff$means)
         df[]<-' '
-        values$data<-as.matrix(df)
+        values$data <- restore_standard_means(as.matrix(df))
         df2<-data.frame(Variance=c(1,1))
         df2[]<-' '
         row.names(df2)<-c('Block','Error')
@@ -2200,7 +2552,7 @@ server<-function(input,output,session) {
         }
         df<-data.frame(Mean = crd$fixeff$means)
         df[]<-' '
-        values$data<-as.matrix(df)
+        values$data <- restore_standard_means(as.matrix(df))
         df2<-data.frame(Variance=c(1,1,1))
         df2[]<-' '
         row.names(df2)<-c('Row','Col','Error')
@@ -2244,9 +2596,13 @@ server<-function(input,output,session) {
             fac_formula <- paste(fac_names, collapse = "+")
           }else{
             interaction_terms <- interaction_formula_number()
+            interaction_terms <- interaction_terms[vapply(
+              strsplit(gsub("\\s+", "", interaction_terms), ":", fixed = TRUE),
+              function(parts) length(parts) >= 2L && all(parts %in% fac_names),
+              logical(1)
+            )]
             interaction_terms<-unique(interaction_terms)
             interaction_terms<-interaction_terms[order(interaction_terms)]
-            
             fac_formula <- paste(c(fac_names, interaction_terms), collapse = "+")
           }
           
@@ -2324,10 +2680,9 @@ server<-function(input,output,session) {
   
   observeEvent({
     list(
-      tryCatch(input$design_title,error=function(e) NULL),
+      tryCatch(design_family(),error=function(e) NULL),
       tryCatch(levels_vec(), error = function(e) NULL),
       tryCatch(levels_num_trt(), error = function(e) NULL),
-      tryCatch(input$num_rep, error = function(e) NULL),
       tryCatch(interaction_option_number(), error = function(e) NULL),
       tryCatch(interaction_formula_number(), error = function(e) NULL),
       
@@ -2343,7 +2698,7 @@ server<-function(input,output,session) {
   }, {
     req(page_started())
     output$input_data_ui <- renderUI({
-      if(!input$design_title%in%c('Split Plot Design','General Design')){
+      if(design_family() == "standard"){
         factor_count <- levels_num_trt()
         note_text <- if (factor_count>=2) {
           req(input$interaction_option)
@@ -2356,7 +2711,7 @@ server<-function(input,output,session) {
           "Enter the expected mean response for each treatment level."
         }
         
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         num_trt_main <- levels_num_trt_main()
         num_trt_sub <- levels_num_trt_sub()
         req(num_trt_main + num_trt_sub <= MAX_TREATMENT_FACTORS)
@@ -2367,19 +2722,19 @@ server<-function(input,output,session) {
         } else if (input$interaction_option == "No") {
           "Enter the expected marginal mean at each level of every factor."
         } 
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         req(datavalues$custom_data)
         note_text<-NULL
       }
       
-      if(input$design_title!='General Design'){
+      if(design_family() != "custom"){
         div(
           class = "workflow-section",
           section_header("table", "Expected responses", "Enter plausible outcome means under the alternative hypothesis."),
           tags$p(note_text, class = "field-note"),
           uiOutput('design_table_ui')
         )
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         div(
           class = "workflow-section",
           section_header("table", "Expected responses", "Enter plausible outcome means for every model row generated from the custom design."),
@@ -2390,15 +2745,15 @@ server<-function(input,output,session) {
     })
     
     output$design_table_ui <- renderUI({
-      if(!input$design_title%in%c('Split Plot Design','General Design')){
+      if(design_family() == "standard"){
         req(input$level_numbers)
         req(input$num_trt)
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         req(input$level_numbers_main)
         req(input$num_trt_main)
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         req(datavalues$custom_data)
       }
       if (is.null(values$data)) {
@@ -2461,10 +2816,9 @@ server<-function(input,output,session) {
   
   observeEvent({
     list(
-      tryCatch(input$design_title,error=function(e) NULL),
+      tryCatch(design_family(),error=function(e) NULL),
       tryCatch(levels_vec(), error = function(e) NULL),
       tryCatch(levels_num_trt(), error = function(e) NULL),
-      tryCatch(input$num_rep, error = function(e) NULL),
       tryCatch(interaction_option_number(), error = function(e) NULL),
       tryCatch(interaction_formula_number(), error = function(e) NULL),
       
@@ -2481,14 +2835,14 @@ server<-function(input,output,session) {
     req(page_started())
     output$input_variance_ui <- renderUI({
       
-      if(!input$design_title%in%c('Split Plot Design','General Design')){
+      if(design_family() == "standard"){
         req(input$num_trt)
         
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         req(input$num_trt_main)
         req(input$num_trt_sub)
         
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         req(datavalues$custom_data)
       }
       
@@ -2503,15 +2857,15 @@ server<-function(input,output,session) {
     })
     
     output$design_variance_table_ui <- renderUI({
-      if(!input$design_title%in%c('Split Plot Design','General Design')){
+      if(design_family() == "standard"){
         req(input$level_numbers)
         req(input$num_trt)
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         req(input$level_numbers_main)
         req(input$num_trt_main)
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         req(datavalues$custom_data)
       }
       if (is.null(values$variance)) {
@@ -2522,9 +2876,9 @@ server<-function(input,output,session) {
           )
         )
       }else{
-        if(input$design_title!="General Design"){
+        if(design_family() != "custom"){
           rhandsontable::rHandsontableOutput("design_variance_table")
-        }else if(input$design_title=="General Design"){
+        }else if(design_family() == "custom"){
           if (!is.list(values$variance)) {
             return(tags$em("Complete the custom-design model settings to create the variance tables."))
           }
@@ -2546,7 +2900,7 @@ server<-function(input,output,session) {
     
     output$design_variance_table <- rhandsontable::renderRHandsontable({
       req(values$variance)
-      req(input$design_title != "General Design")
+      req(design_family() != "custom")
       
       df <- as.data.frame(values$variance)
       
@@ -2899,7 +3253,7 @@ server<-function(input,output,session) {
   }
   
   output$test_options_ui<-renderUI({
-    req(page_started())
+    req(page_started(), design_family())
     if(input$Type=='F-test'){
       tagList(
         div(
@@ -2910,9 +3264,9 @@ server<-function(input,output,session) {
               inputId = "Type_ss",
               label = "Sum-of-squares method",
               choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
-              selected = "Type III",
+              selected = input$Type_ss %||% "Type III",
               width = '100%'),
-            sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
+            sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value1 %||% 0.05,step=0.005,width = "100%"),
             field_note("Type III and \u03b1 = 0.05 are common defaults. Change them only when your analysis plan specifies another choice."),
             actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                          class = "btn-primary",
@@ -2921,7 +3275,7 @@ server<-function(input,output,session) {
         )
       )
     }else if(input$Type=='t-test'){
-      if(!input$design_title%in%c("Split Plot Design",'General Design')){
+      if(design_family() == "standard"){
         req(input$num_trt,input$level_numbers)
         num_trt <- levels_num_trt()
         
@@ -3014,17 +3368,17 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",
+                selected = input$alternative %||% "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value2 %||% 0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj),width = "100%"),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
           )
         )
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         req(input$num_trt_main,input$num_trt_sub,input$level_numbers_main,input$level_numbers_sub)
         num_trt_main<-levels_num_trt_main()
         num_trt_sub<-levels_num_trt_sub()
@@ -3120,17 +3474,17 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",
+                selected = input$alternative %||% "two.sided",
                 width = "100%"),
-              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F),
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value2 %||% 0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj)),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
           )
         )
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         df <- datavalues$custom_data
         tagList(
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
@@ -3179,9 +3533,9 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",width = "100%"),
-              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+                selected = input$alternative %||% "two.sided",width = "100%"),
+              sliderInput("p_value2",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value2 %||% 0.05,step=0.005,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj),width = "100%"),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
@@ -3190,7 +3544,7 @@ server<-function(input,output,session) {
         )
       }
     }else if(input$Type=='F-test & t-test'){
-      if(!input$design_title%in%c('Split Plot Design','General Design')){
+      if(design_family() == "standard"){
         req(input$num_trt, input$level_numbers)
         num_trt <- levels_num_trt()
         
@@ -3215,9 +3569,9 @@ server<-function(input,output,session) {
                 inputId = "Type_ss",
                 label = "Sum-of-squares method",
                 choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
-                selected = "Type III",
+                selected = input$Type_ss %||% "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value1 %||% 0.05,step=0.005,width = "100%")
             )
           ),
           if(num_trt>1){
@@ -3294,16 +3648,16 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",
+                selected = input$alternative %||% "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj),width = "100%"),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
           )
         )
-      }else if(input$design_title=='Split Plot Design'){
+      }else if(design_family() == "split_plot"){
         req(input$num_trt_main,input$num_trt_sub,input$level_numbers_main,input$level_numbers_sub)
         num_trt_main<-levels_num_trt_main()
         num_trt_sub<-levels_num_trt_sub()
@@ -3330,9 +3684,9 @@ server<-function(input,output,session) {
                 inputId = "Type_ss",
                 label = "Sum-of-squares method",
                 choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
-                selected = "Type III",
+                selected = input$Type_ss %||% "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value1 %||% 0.05,step=0.005,width = "100%")
             )
           ),
           
@@ -3413,16 +3767,16 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",
+                selected = input$alternative %||% "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj),width = "100%"),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
             )
           )
         )
-      }else if(input$design_title=='General Design'){
+      }else if(design_family() == "custom"){
         df <- datavalues$custom_data
         tagList(
           div(
@@ -3433,9 +3787,9 @@ server<-function(input,output,session) {
                 inputId = "Type_ss",
                 label = "Sum-of-squares method",
                 choices = c('Type I (sequential)' = 'Type I', 'Type II (main effects adjusted)' = 'Type II', 'Type III (fully adjusted)' = 'Type III'),
-                selected = "Type III",
+                selected = input$Type_ss %||% "Type III",
                 width = "100%"),
-              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=0.05,step=0.005,width = "100%")
+              sliderInput("p_value1",'Significance threshold (\u03b1)',min=0.005,max=0.2,value=input$p_value1 %||% 0.05,step=0.005,width = "100%")
             )
           ),
           
@@ -3485,9 +3839,9 @@ server<-function(input,output,session) {
                 inputId = "alternative",
                 label = "Alternative hypothesis",
                 choices = c('One-sided' = 'one.sided', 'Two-sided' = 'two.sided'),
-                selected = "two.sided",
+                selected = input$alternative %||% "two.sided",
                 width = "100%"),
-              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = F,width = "100%"),
+              checkboxInput("p.adj", "Adjust for multiple comparisons (Bonferroni)", value = isTRUE(input$p.adj),width = "100%"),
               actionButton('create_result', tagList(icon("calculator"), ' Run power analysis'),
                            class = "btn-primary",
                            style = "width: 100%;",width = "100%")
@@ -3763,7 +4117,7 @@ server<-function(input,output,session) {
     factor_count_result(input$num_trt)$message
   }
   
-  observeEvent(input$create_result,{
+  observeEvent(input$run_analysis,{
     req(page_started())
     req(input$design_title)
     count_error <- active_factor_count_error()
@@ -4457,6 +4811,8 @@ server<-function(input,output,session) {
         )
       }
       results_generated(TRUE)
+      results_seen(TRUE)
+      go_to_stage("results", 4L)
     }, error = function(e) {
       showNotification(
         paste("Power could not be calculated. Review the design assumptions and test settings.", e$message),
