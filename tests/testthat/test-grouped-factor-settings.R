@@ -26,7 +26,7 @@ test_that("the app header provides an accessible issue-reporting link", {
   })
 })
 
-test_that("design selection and replication controls are grouped in the left column", {
+test_that("the app presents a guided workflow with editable result summaries", {
   shiny::testServer(app_environment$server, {
     main_html <- paste(as.character(output$main_ui), collapse = "\n")
     selection_position <- regexpr("design-selection-card", main_html, fixed = TRUE)[[1]]
@@ -36,6 +36,15 @@ test_that("design selection and replication controls are grouped in the left col
     expect_gt(selection_position, 0)
     expect_gt(treatment_position, selection_position)
     expect_gt(assumptions_position, treatment_position)
+    expect_match(main_html, 'id="workflow_stage"', fixed = TRUE)
+    expect_match(main_html, 'class="workflow-stage design-stage"', fixed = TRUE)
+    expect_match(main_html, 'class="workflow-stage assumptions-stage"', fixed = TRUE)
+    expect_match(main_html, 'class="workflow-stage test-stage"', fixed = TRUE)
+    expect_match(main_html, 'class="results-workspace"', fixed = TRUE)
+    expect_match(main_html, 'id="continue_to_assumptions"', fixed = TRUE)
+    expect_match(main_html, 'id="continue_to_tests"', fixed = TRUE)
+    expect_match(main_html, 'id="run_analysis"', fixed = TRUE)
+    expect_match(main_html, 'class="analysis-setup-details"', fixed = TRUE)
     expect_match(main_html, 'id="design_title"', fixed = TRUE)
     expect_match(main_html, "Design setup", fixed = TRUE)
     expect_match(main_html, "Model assumptions", fixed = TRUE)
@@ -55,11 +64,22 @@ test_that("design selection and replication controls are grouped in the left col
 
     structure_html <- paste(as.character(output$treatment_structure_ui), collapse = "\n")
     assumptions_html <- paste(as.character(output$dynamic_sidebar), collapse = "\n")
+    navigation_html <- paste(as.character(output$workflow_navigation), collapse = "\n")
     expect_match(structure_html, "Treatment structure", fixed = TRUE)
     expect_match(structure_html, 'id="num_trt"', fixed = TRUE)
     expect_false(grepl("step-badge", structure_html, fixed = TRUE))
     expect_match(assumptions_html, "Analysis model", fixed = TRUE)
     expect_false(grepl("Treatment structure", assumptions_html, fixed = TRUE))
+    expect_match(navigation_html, "CRD · 1 factor", fixed = TRUE)
+    expect_match(navigation_html, "Available after running", fixed = TRUE)
+    expect_match(navigation_html, 'aria-disabled="true"', fixed = TRUE)
+
+    results_seen(TRUE)
+    results_generated(TRUE)
+    session$flushReact()
+    completed_navigation <- paste(as.character(output$workflow_navigation), collapse = "\n")
+    expect_match(completed_navigation, "Power results ready", fixed = TRUE)
+    expect_false(grepl('aria-disabled="true"', completed_navigation, fixed = TRUE))
   })
 
   selector_html <- paste(
@@ -154,9 +174,95 @@ test_that("design selection and replication controls are grouped in the left col
   expect_match(app_environment$app_css, "@media (max-width: 860px)", fixed = TRUE)
   expect_match(
     app_environment$app_css,
-    "grid-template-areas: 'design' 'test' 'results'",
+    ".results-workspace { grid-template-columns: 1fr; }",
     fixed = TRUE
   )
+})
+
+test_that("standard design changes retain compatible analysis state", {
+  expect_identical(
+    unname(vapply(
+      c(
+        "Completely Randomized Design",
+        "Randomized Complete Block Design",
+        "Latin Square Design"
+      ),
+      app_environment$design_family_for,
+      character(1)
+    )),
+    rep("standard", 3)
+  )
+  expect_identical(app_environment$design_family_for("Split Plot Design"), "split_plot")
+  expect_identical(app_environment$design_family_for("General Design"), "custom")
+  expect_null(app_environment$design_family_for(NULL))
+
+  shiny::testServer(app_environment$server, {
+    session$setInputs(
+      start_btn = 1,
+      design_title = "Completely Randomized Design",
+      num_rep = 8,
+      num_trt = 2,
+      factor_1 = 2,
+      factor_2 = 2,
+      level_numbers = "2,2",
+      treatment_factor_name_1 = "Starch",
+      treatment_factor_levels_1 = "Low, High",
+      treatment_factor_name_2 = "NDF",
+      treatment_factor_levels_2 = "Low, High",
+      interaction_option = "Yes",
+      interaction_formula = "facA : facB",
+      Type = "F-test & t-test",
+      Type_ss = "Type II",
+      p_value1 = 0.025,
+      which_para = "facA",
+      by_para = "facB",
+      Contrast = "pairwise",
+      alternative = "one.sided",
+      p.adj = TRUE
+    )
+    session$flushReact()
+
+    standard_means_cache(matrix(c(1, 2, 3, 4), ncol = 1))
+    session$setInputs(
+      design_title = "Randomized Complete Block Design",
+      num_block = 8
+    )
+    session$flushReact()
+
+    expect_identical(design_family(), "standard")
+    expect_identical(input$num_trt, 2)
+    expect_identical(input$treatment_factor_name_1, "Starch")
+    expect_identical(input$treatment_factor_name_2, "NDF")
+    expect_identical(input$interaction_option, "Yes")
+    expect_identical(input$interaction_formula, "facA : facB")
+    expect_identical(input$Type, "F-test & t-test")
+    expect_identical(input$Type_ss, "Type II")
+    expect_equal(input$p_value1, 0.025)
+    expect_identical(input$which_para, "facA")
+    expect_identical(input$by_para, "facB")
+    expect_identical(input$alternative, "one.sided")
+    expect_true(input$p.adj)
+    expect_equal(as.numeric(values$data[, 1]), c(1, 2, 3, 4))
+    expect_identical(rownames(values$variance), c("Block", "Error"))
+
+    model_html <- paste(as.character(output$model_ui), collapse = "\n")
+    expect_match(model_html, "Starch + NDF + Starch : NDF", fixed = TRUE)
+    expect_match(model_html, "block", fixed = TRUE)
+
+    session$setInputs(
+      design_title = "Latin Square Design",
+      num_squares = 4,
+      value_reuse = "none"
+    )
+    session$flushReact()
+
+    expect_equal(as.numeric(values$data[, 1]), c(1, 2, 3, 4))
+    expect_identical(rownames(values$variance), c("Row", "Col", "Error"))
+    expect_identical(input$interaction_formula, "facA : facB")
+    expect_identical(input$Type_ss, "Type II")
+    expect_identical(input$which_para, "facA")
+    expect_identical(input$by_para, "facB")
+  })
 })
 
 test_that("custom designs can initialize an editable table", {

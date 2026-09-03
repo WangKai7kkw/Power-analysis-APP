@@ -87,7 +87,9 @@ test_that("Power Calculation renders the CRD result tables", {
   app$wait_for_idle()
 
   # Exercise the real action button and the complete server/rendering path.
-  app$click("create_result")
+  app$click("workflow_step_3")
+  app$wait_for_idle()
+  app$click("run_analysis")
   app$wait_for_js(
     "(document.querySelectorAll('#power_omnibus_test table tbody tr').length === 1 &&
       document.querySelectorAll('#power_contrast table tbody tr').length === 6) ||
@@ -278,4 +280,143 @@ test_that("custom factor names appear throughout multifactor model controls", {
       document.querySelector('#by_para').value === 'NULL'"
   )))
   expect_false(any(grepl("An error occurred", app$get_text("body"), fixed = TRUE)))
+})
+
+test_that("compatible standard designs retain treatment, model, means, and tests", {
+  previous_cran_override <- Sys.getenv(
+    "SHINYTEST2_APP_DRIVER_TEST_ON_CRAN",
+    unset = NA_character_
+  )
+  Sys.setenv(SHINYTEST2_APP_DRIVER_TEST_ON_CRAN = "1")
+  on.exit({
+    if (is.na(previous_cran_override)) {
+      Sys.unsetenv("SHINYTEST2_APP_DRIVER_TEST_ON_CRAN")
+    } else {
+      Sys.setenv(SHINYTEST2_APP_DRIVER_TEST_ON_CRAN = previous_cran_override)
+    }
+  }, add = TRUE)
+
+  app_dir <- normalizePath(file.path("..", ".."), mustWork = TRUE)
+  app <- shinytest2::AppDriver$new(
+    app_dir = app_dir,
+    name = "standard-design-state-retention",
+    width = 1400,
+    height = 900,
+    load_timeout = 30 * 1000,
+    timeout = 15 * 1000
+  )
+  on.exit(app$stop(), add = TRUE)
+
+  app$click("start_btn")
+  app$set_inputs(num_trt = 2, wait_ = FALSE, priority_ = "event")
+  app$wait_for_js(
+    "document.querySelector('#treatment_factor_name_2') &&
+      window.HTMLWidgets && window.HTMLWidgets.find('#design_table')",
+    timeout = 30 * 1000
+  )
+  app$set_inputs(
+    treatment_factor_name_1 = "Starch",
+    treatment_factor_levels_1 = "Low, High",
+    treatment_factor_name_2 = "NDF",
+    treatment_factor_levels_2 = "Low, High",
+    interaction_option = "Yes",
+    wait_ = FALSE,
+    priority_ = "event"
+  )
+  app$wait_for_js("document.querySelector('#interaction_formula')", timeout = 15 * 1000)
+  app$set_inputs(
+    interaction_formula = "facA : facB",
+    Type = "F-test & t-test",
+    Type_ss = "Type II",
+    p_value1 = 0.025,
+    which_para = "facA",
+    by_para = "facB",
+    Contrast = "pairwise",
+    alternative = "one.sided",
+    p.adj = TRUE,
+    wait_ = FALSE,
+    priority_ = "event"
+  )
+  app$run_js(
+    "window.HTMLWidgets.find('#design_table').hot.setDataAtCell([
+      [0, 0, 1], [1, 0, 2], [2, 0, 3], [3, 0, 4]
+    ]);"
+  )
+  app$wait_for_idle()
+
+  app$set_inputs(
+    design_title = "Randomized Complete Block Design",
+    wait_ = FALSE,
+    priority_ = "event"
+  )
+  app$wait_for_js(
+    "document.querySelector('#num_block') &&
+      document.querySelector('#treatment_factor_name_2') &&
+      document.querySelector('#model_ui').innerText.includes('( 1 | block )') &&
+      window.HTMLWidgets.find('#design_variance_table').hot.countRows() === 2",
+    timeout = 15 * 1000
+  )
+  expect_true(isTRUE(app$get_js(
+    "document.querySelector('#num_trt').value === '2' &&
+      document.querySelector('#treatment_factor_name_1').value === 'Starch' &&
+      document.querySelector('#treatment_factor_levels_1').value === 'Low, High' &&
+      document.querySelector('#treatment_factor_name_2').value === 'NDF' &&
+      document.querySelector('#treatment_factor_levels_2').value === 'Low, High' &&
+      document.querySelector('#interaction_option').value === 'Yes' &&
+      document.querySelector('#interaction_formula').selectize.items.includes('facA : facB') &&
+      document.querySelector('#Type').value === 'F-test & t-test' &&
+      document.querySelector('#Type_ss').value === 'Type II' &&
+      Number(document.querySelector('#p_value1').value) === 0.025 &&
+      document.querySelector('#which_para').value === 'facA' &&
+      document.querySelector('#by_para').value === 'facB' &&
+      document.querySelector('#Contrast').value === 'pairwise' &&
+      document.querySelector('#alternative').value === 'one.sided' &&
+      document.getElementById('p.adj').checked"
+  )))
+  expect_equal(
+    as.numeric(unlist(app$get_js("window.HTMLWidgets.find('#design_table').hot.getDataAtCol(0)"))),
+    c(1, 2, 3, 4)
+  )
+
+  app$set_inputs(
+    design_title = "Latin Square Design",
+    wait_ = FALSE,
+    priority_ = "event"
+  )
+  app$wait_for_js(
+    "document.querySelector('#num_squares') &&
+      document.querySelector('#model_ui').innerText.includes('( 1 | row )') &&
+      window.HTMLWidgets.find('#design_variance_table').hot.countRows() === 3",
+    timeout = 15 * 1000
+  )
+  expect_equal(
+    as.numeric(unlist(app$get_js("window.HTMLWidgets.find('#design_table').hot.getDataAtCol(0)"))),
+    c(1, 2, 3, 4)
+  )
+  expect_true(isTRUE(app$get_js(
+    "document.querySelector('#num_trt').value === '2' &&
+      document.querySelector('#interaction_formula').selectize.items.includes('facA : facB') &&
+      document.querySelector('#Type_ss').value === 'Type II' &&
+      document.querySelector('#which_para').value === 'facA' &&
+      document.querySelector('#by_para').value === 'facB'"
+  )))
+
+  app$set_inputs(
+    design_title = "Split Plot Design",
+    wait_ = FALSE,
+    priority_ = "event"
+  )
+  app$wait_for_js(
+    "document.querySelector('#num_trt_main') &&
+      document.querySelector('#num_trt_sub') &&
+      !document.querySelector('#num_trt')",
+    timeout = 15 * 1000
+  )
+  app$click("continue_to_assumptions")
+  app$wait_for_js(
+    "document.querySelector('#interaction_option').value === 'No' &&
+      window.HTMLWidgets.find('#design_table').hot.getDataAtCol(0)
+        .every(value => value === null || String(value).trim() === '')",
+    timeout = 15 * 1000
+  )
 })
