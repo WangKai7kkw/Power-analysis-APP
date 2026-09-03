@@ -59,11 +59,11 @@ The app supports power analysis for a variety of standard experimental designs a
 | **Randomized Complete Block Design (RCBD)** | Experimental units grouped into blocks to control for known sources of variability |
 | **Latin Square Design (LSD)** | Two blocking factors (rows and columns) to control two sources of variability; supports replicated squares with options to reuse row or column blocks |
 | **Split-Plot Design (SPD)** | Two levels of experimental units (main plots and sub-plots); supports multiple main-plot and sub-plot factors |
-| **General Design** | Upload your own data file to define a custom design using `lme4`/`nlme` model syntax |
+| **General Design** | Upload a data file or create an editable table to define a custom design using `lme4`/`nlme` model syntax |
 
 ## Features
 
-- **Three-panel interface**: Design setup, Power Calculation settings, and Results display
+- **Four-step workflow**: Design setup, Model assumptions, Test settings, and Results & export
 - **Flexible factor specification**: Define up to eight treatment factors with any number of levels
 - **Custom treatment names**: Replace generated factor and level labels with study-specific names that carry through the model preview, interaction and t-test selectors, assumption tables, results, and CSV exports
 - **Interaction effects**: Optionally include interaction terms between factors
@@ -71,42 +71,40 @@ The app supports power analysis for a variety of standard experimental designs a
 - **Variance input**: Specify variance components for each random effect (block, row, column, main-plot, error)
 - **F-test power**: Choose Type I, II, or III sums of squares and set the significance level
 - **t-test power**: Pairwise, treatment vs. control (`trt.vs.ctrl`), polynomial (`poly`), or custom contrast vectors; supports one-sided and two-sided alternatives; optional Bonferroni adjustment
-- **General Design mode**: Upload a data file (CSV, XLSX, XLS, TSV, TXT) and specify any `lme4::lmer`-compatible formula along with optional `nlme` residual correlation structures
+- **General Design mode**: Upload a data file (CSV, XLSX, XLS, TSV, TXT) or create and paste into an editable table, then specify any `lme4::lmer`-compatible formula along with optional `nlme` residual correlation structures
 - **Download results**: Export all power analysis results to a file
 
 ## Usage
 
-### Step 1 – Select a Design
+### Step 1 – Design setup
 
-Use the **Select Design** dropdown at the top to choose one of the five experimental designs.
-
-### Step 2 – Configure the Design Panel
-
-Fill in the **Design** panel on the left:
+Choose an experimental design and provide its replication or layout settings. For standard designs, define the treatment factors, factor names, levels, and level names in the **Treatment structure** section. For a custom design, upload a data file or create an editable design table.
 
 - **CRD / RCBD / LSD**: Set the number of treatment factors and their levels. For RCBD, enter the number of blocks. For LSD, set the number of replicated squares and the block-reuse option (`row`, `col`, or `none`).
 - **Split-Plot Design**: Set the number of main-plot factors and sub-plot factors, their levels, and the number of main-plot replicates per treatment.
-- **General Design**: Upload a data file and specify the model formula (e.g., `~ fA + fB + (1|block)`) and an optional residual correlation structure (e.g., `corAR1(value=0.6, form=~fA|fC)`).
+- **General Design**: Upload a data file or create an editable design table and assign each column as a factor or numeric variable.
 
 For standard designs, use **Treatment names** to replace generated labels such as `trt1` or `facA1` with the factor and level names used in your study. Enter one comma-separated level name for every configured level. These names appear consistently throughout the workflow and in exports; the underlying statistical model is unchanged.
 
+### Step 2 – Model assumptions
+
+Review the generated analysis model or enter a custom model formula. Then provide plausible expected responses and variance estimates for random effects and residual error.
+
 For designs with multiple factors, choose whether to include interaction terms and select the desired interaction combinations.
 
-### Step 3 – Enter Means and Variances
+For a General Design, specify the model formula (e.g., `~ fA + fB + (1|block)`) and an optional residual correlation structure (e.g., `corAR1(value=0.6, form=~fA|fC)`).
 
-After configuring the design, fill in the **Means** table with the expected treatment means and the **Variance** table with the variance components for each random effect.
+### Step 3 – Test settings
 
-### Step 4 – Configure Power Calculation
-
-In the **Power Calculation** panel:
+Choose the effects or comparisons to test and define the testing criteria:
 
 - Choose the **Type of test**: F-test, t-test, or both.
 - **F-test**: Select the type of sum of squares (Type I, II, or III) and set the significance level.
 - **t-test**: Select the factor of interest, an optional conditioning variable, a contrast method (pairwise, `trt.vs.ctrl`, `poly`, or a custom contrast vector), the alternative hypothesis direction, the significance level, and whether to apply Bonferroni adjustment.
 
-### Step 5 – Run and Download
+### Step 4 – Results & export
 
-Click **Power Calculation** to compute power. Results are displayed in the **Power Analysis Results** panel. Click **Download Results** to save the output.
+Run the power analysis, review the estimated power, and download a record of the results.
 
 ## Dependencies
 

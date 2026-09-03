@@ -32,15 +32,169 @@ panel_header <- function(step, eyebrow, title, description) {
     class = "panel-heading",
     div(class = "step-badge", step),
     div(
-      div(class = "panel-eyebrow", eyebrow),
+      if (!is.null(eyebrow)) div(class = "panel-eyebrow", eyebrow),
       tags$h2(title),
-      tags$p(description)
+      if (!is.null(description)) tags$p(description)
     )
   )
 }
 
 field_note <- function(...) {
   div(class = "field-note", icon("circle-info"), tags$span(...))
+}
+
+experimental_design_input <- function() {
+  selectInput(
+    inputId = "design_title",
+    label = "Choose the design",
+    choices = c(
+      "Completely randomized design (CRD)" = "Completely Randomized Design",
+      "Randomized complete block design (RCBD)" = "Randomized Complete Block Design",
+      "Latin square design" = "Latin Square Design",
+      "Split-plot design" = "Split Plot Design",
+      "Custom design" = "General Design"
+    ),
+    selected = "Completely Randomized Design",
+    width = "100%"
+  )
+}
+
+replication_settings_ui <- function(design_title) {
+  if (identical(design_title, "Completely Randomized Design")) {
+    return(tagList(
+      div(
+        class = "field-with-help",
+        numericInput(
+          "num_rep", "Replicates per treatment",
+          value = 8, min = 1, width = "100%"
+        ),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "In factorial designs, each combination of factor levels is treated as one treatment.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    ))
+  }
+
+  if (identical(design_title, "Randomized Complete Block Design")) {
+    return(tagList(
+      numericInput("num_block", "Number of blocks", value = 8, min = 1, width = "100%"),
+      field_note(
+        "The block size is fixed by the number of treatments because each block contains every treatment once. Use Custom design for incomplete blocks or multiple replicates of a treatment within each block."
+      )
+    ))
+  }
+
+  if (identical(design_title, "Latin Square Design")) {
+    return(tagList(
+      div(
+        class = "field-with-help",
+        numericInput("num_squares", "Number of squares", value = 4, min = 1, width = "100%"),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "For crossover designs, row and column blocks can represent subjects and time periods.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      field_note("The square size—the number of row and column blocks—is determined by the number of treatments."),
+      div(
+        class = "field-with-help",
+        selectInput(
+          inputId = "value_reuse",
+          label = "Reuse blocks across squares",
+          choices = c(
+            "Reuse row blocks" = "row",
+            "Reuse column blocks" = "col",
+            "Use new row and column blocks" = "none"
+          ),
+          selected = "none",
+          width = "100%"
+        ),
+        tags$span(
+          `data-toggle` = "tooltip",
+          title = "Note: 'row' for reusing row blocks, 'col' for reusing column blocks, or 'none' for reusing neither row nor column blocks to replicate a single square.",
+          class = "field-help-icon",
+          icon("question-circle")
+        )
+      ),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    ))
+  }
+
+  if (identical(design_title, "Split Plot Design")) {
+    return(tagList(
+      numericInput(
+        "num_rep", "Whole plots per main treatment",
+        value = 10, min = 1, width = "100%"
+      )
+    ))
+  }
+
+  if (identical(design_title, "General Design")) {
+    return(tagList(
+      section_header(
+        "table", "Study layout",
+        "Provide a long-format design table with separate columns for treatment factors and all other design variables."
+      ),
+      radioButtons(
+        inputId = "custom_data_source",
+        label = "Data entry method",
+        choices = c("Upload file" = "upload", "Create table" = "manual"),
+        selected = "upload",
+        inline = TRUE,
+        width = "100%"
+      ),
+      conditionalPanel(
+        condition = "input.custom_data_source === 'upload'",
+        fileInput(
+          inputId = "uploaded_file",
+          label = "Study data",
+          accept = c(".csv", ".xlsx", ".xls", ".txt", ".tsv"),
+          buttonLabel = "Choose file",
+          placeholder = "CSV, Excel, TSV, or TXT",
+          width = "100%"
+        ),
+        uiOutput("file_feedback")
+      ),
+      conditionalPanel(
+        condition = "input.custom_data_source === 'manual'",
+        div(
+          class = "manual-table-setup",
+          textInput(
+            inputId = "manual_column_names",
+            label = "Column names",
+            value = "treatment, block",
+            placeholder = "For example: treatment, block, subject, time",
+            width = "100%"
+          ),
+          numericInput(
+            inputId = "manual_row_count",
+            label = "Number of rows",
+            value = 12,
+            min = 1,
+            max = 1000,
+            step = 1,
+            width = "100%"
+          )
+        ),
+        actionButton(
+          inputId = "create_manual_table",
+          label = tagList(icon("table"), " Create table"),
+          class = "btn-primary",
+          width = "100%"
+        ),
+        uiOutput("manual_table_feedback"),
+        rhandsontable::rHandsontableOutput("custom_layout_table")
+      ),
+      uiOutput("file_type_check")
+    ))
+  }
+
+  NULL
 }
 
 friendly_term_choices <- function(values, treatment_spec = NULL) {
@@ -191,39 +345,21 @@ app_css <- "
     color: var(--danger) !important;
   }
 
-  .design-selector-card {
-    display: grid;
-    grid-template-columns: minmax(260px, 1fr) minmax(340px, 620px);
-    align-items: end;
-    gap: 32px;
+  .app-intro-card {
     padding: 24px 26px;
     border: 1px solid #cfe0ff;
     border-radius: 18px;
     background: linear-gradient(120deg, #fff 20%, #eff6ff 100%);
     box-shadow: var(--shadow);
   }
-  .design-selector-card h1 {
+  .app-intro-card h1 {
     margin: 0 0 6px;
     font-size: clamp(26px, 2vw, 34px);
     line-height: 1.15;
     letter-spacing: -.035em;
     font-weight: 780;
   }
-  .design-selector-card p { margin: 0; max-width: 690px; color: var(--muted); }
-  .design-control { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: end; }
-  .design-control .form-group { margin-bottom: 0; }
-  .step-kicker {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 38px;
-    margin-bottom: 1px;
-    border-radius: 10px;
-    background: var(--primary);
-    color: #fff;
-    font-weight: 750;
-  }
+  .app-intro-card p { margin: 0; max-width: 760px; color: var(--muted); }
 
   .workflow-map {
     display: grid;
@@ -260,7 +396,7 @@ app_css <- "
     gap: 18px;
     align-items: start;
   }
-  .design-panel { grid-area: design; }
+  .design-panel { grid-area: design; display: grid; gap: 18px; }
   .test-panel { grid-area: test; }
   .results-panel { grid-area: results; }
 
@@ -300,16 +436,78 @@ app_css <- "
   .panel-body { padding: 18px 20px 20px; }
   .panel-scroll { max-height: calc(100vh - 330px); overflow: auto; scrollbar-gutter: stable; }
 
-  #dynamic_sidebar > .card,
-  #dynamic_sidebar > .shiny-html-output > .card,
-  #dynamic_sidebar .card {
-    margin: 0 0 14px !important;
-    padding: 16px !important;
-    height: auto !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 13px !important;
-    background: var(--surface-subtle) !important;
-    box-shadow: none !important;
+  .design-selection-card .panel-body { padding-bottom: 18px; }
+  .design-selection-card .form-group:last-child { margin-bottom: 0; }
+  .design-settings {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .design-settings .section-heading { margin-bottom: 13px; }
+  .field-with-help {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .field-with-help .form-group { min-width: 0; margin-bottom: 0; }
+  .field-help-icon { color: var(--primary); cursor: pointer; }
+  .design-settings .field-with-help + .field-note { margin-top: 8px; }
+  .manual-table-setup {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 10px;
+  }
+  .design-settings .radio-inline + .radio-inline { margin-left: 18px; }
+  .manual-table-feedback.validation-success,
+  .manual-table-feedback.validation-error { margin: 12px 0 10px; }
+  #manual_table_feedback > .field-note { margin-top: 10px; }
+  #custom_layout_table { margin-top: 10px; overflow-x: auto; }
+  .column-role-list {
+    display: grid;
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .column-role-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) minmax(140px, 1.1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+  }
+  .column-role-name {
+    min-width: 0;
+    margin: 0 !important;
+    overflow-wrap: anywhere;
+  }
+  .column-role-row .form-group { min-width: 0; margin: 0; }
+  .design-sections,
+  .assumption-sections { display: grid; gap: 14px; }
+  .workflow-section {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    background: var(--surface-subtle);
+  }
+  .workflow-section > :last-child { margin-bottom: 0; }
+  .table-scroll-region { max-height: 300px; overflow: auto; }
+  .table-placeholder {
+    min-height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 9px;
+    background: #fff;
+    color: var(--muted);
+    text-align: center;
   }
   .section-heading { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 13px; }
   .section-icon {
@@ -474,7 +672,7 @@ app_css <- "
 
   @media (max-width: 860px) {
     .app-shell { padding: 16px 14px 26px; }
-    .design-selector-card { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+    .app-intro-card { padding: 20px; }
     .app-panels { grid-template-columns: 1fr; grid-template-areas: 'design' 'test' 'results'; }
     .workflow-map { grid-template-columns: repeat(2, 1fr); }
     .app-topbar { align-items: flex-start; }
@@ -486,8 +684,6 @@ app_css <- "
     .topbar-actions { width: 100%; }
     .topbar-actions > * { flex: 1 1 0; }
     .topbar-actions .btn { width: 100%; white-space: nowrap; font-size: 13px !important; }
-    .design-control { grid-template-columns: 1fr; }
-    .step-kicker { display: none; }
     .workflow-map { gap: 2px; }
     .workflow-map-item { padding: 8px 5px; font-size: 11px; }
     .workflow-card > .card-header, .panel-body { padding: 15px; }
@@ -556,36 +752,17 @@ server<-function(input,output,session) {
         )
       ),
       div(
-        class = "design-selector-card",
-        div(
-          tags$h1("Plan your power analysis"),
-          tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
-        ),
-        div(
-          class = "design-control",
-          div(class = "step-kicker", "1"),
-          selectInput(
-            inputId = "design_title",
-            label = "Experimental design",
-            choices = c(
-              "Completely randomized (CRD)" = "Completely Randomized Design",
-              "Randomized complete block (RCBD)" = "Randomized Complete Block Design",
-              "Latin square" = "Latin Square Design",
-              "Split-plot" = "Split Plot Design",
-              "Custom design from uploaded data" = "General Design"
-            ),
-            selected = "Completely Randomized Design",
-            width = '100%'
-          )
-        )
+        class = "app-intro-card",
+        tags$h1("Plan your power analysis"),
+        tags$p("Describe the experiment you intend to run, enter realistic assumptions, then estimate the chance of detecting the effects that matter.")
       ),
       tags$nav(
         class = "workflow-map",
         `aria-label` = "Power analysis workflow",
-        div(class = "workflow-map-item", tags$span("1"), "Choose a design"),
-        div(class = "workflow-map-item", tags$span("2"), "Enter assumptions"),
-        div(class = "workflow-map-item", tags$span("3"), "Configure the test"),
-        div(class = "workflow-map-item", tags$span("4"), "Review & export")
+        div(class = "workflow-map-item", tags$span("1"), "Design setup"),
+        div(class = "workflow-map-item", tags$span("2"), "Model assumptions"),
+        div(class = "workflow-map-item", tags$span("3"), "Test settings"),
+        div(class = "workflow-map-item", tags$span("4"), "Results & export")
       ),
       
       div(
@@ -594,13 +771,38 @@ server<-function(input,output,session) {
         div(
           class = "app-panel design-panel",
           card(
-            class = "workflow-card",
-            card_header(panel_header("2", "Design assumptions", "Describe the study", "Set factor levels, sample size, expected means, and sources of variation.")),
+            class = "workflow-card design-selection-card",
+            card_header(panel_header(
+              "1", NULL, "Design setup",
+              "Choose the experimental design, define replication, and describe the treatment structure."
+            )),
             div(
-              class = "panel-body panel-scroll",
+              class = "panel-body",
+              div(
+                class = "design-sections",
+                div(
+                  class = "workflow-section experiment-layout-section",
+                  section_header(
+                    "compass", "Experiment layout",
+                    "Choose the design and specify how experimental units are arranged or replicated."
+                  ),
+                  experimental_design_input(),
+                  div(class = "design-settings", uiOutput("replication_controls_ui"))
+                ),
+                uiOutput("treatment_structure_ui")
+              )
+            )
+          ),
+          card(
+            class = "workflow-card",
+            card_header(panel_header(
+              "2", NULL, "Model assumptions",
+              "Specify the analysis model, expected responses, and sources of variation."
+            )),
+            div(
+              class = "panel-body",
               uiOutput("dynamic_sidebar")
-            ),
-            full_screen = TRUE
+            )
           )
         ),
         
@@ -608,7 +810,10 @@ server<-function(input,output,session) {
           class = "app-panel test-panel",
           card(
             class = "workflow-card",
-            card_header(panel_header("3", "Analysis settings", "Choose what to test", "Use an overall F-test, focused contrasts, or both.")),
+            card_header(panel_header(
+              "3", NULL, "Test settings",
+              "Choose the effects or comparisons to test and define the testing criteria."
+            )),
             div(
               class = "panel-body panel-scroll",
               div(
@@ -635,7 +840,10 @@ server<-function(input,output,session) {
           class = "app-panel results-panel",
           card(
             class = "workflow-card",
-            card_header(panel_header("4", "Decision support", "Review the results", "Compare power across effects and download a record of the analysis.")),
+            card_header(panel_header(
+              "4", NULL, "Results & export",
+              "Review estimated power and download a record of the analysis."
+            )),
             div(
               class = "panel-body panel-scroll",
               uiOutput("results_display")
@@ -787,311 +995,136 @@ server<-function(input,output,session) {
     all_terms <- c(all_factors, interaction_terms)
     return(all_terms)
   }
-  
-  output$dynamic_sidebar<-renderUI({
-    req(page_started())
-    req(input$design_title)
-    if(input$design_title=='Completely Randomized Design'){
+
+  output$replication_controls_ui <- renderUI({
+    req(page_started(), input$design_title)
+    replication_settings_ui(input$design_title)
+  })
+
+  output$treatment_structure_ui <- renderUI({
+    req(page_started(), input$design_title)
+    if (input$design_title == "General Design") return(NULL)
+
+    description <- if (input$design_title == "Split Plot Design") {
+      "Separate factors applied to whole plots from those applied within plots."
+    } else if (input$design_title == "Latin Square Design") {
+      "Define the factors and levels arranged within each square."
+    } else {
+      "Define the factors and levels whose effects you want to detect."
+    }
+
+    factor_controls <- if (input$design_title == "Split Plot Design") {
       tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = '100%')
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
+        numericInput(
+          "num_trt_main", "Whole-plot factors",
+          value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+          step = 1, width = "100%"
         ),
-        
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("users", "Replication", "Set how many independent experimental units receive each treatment combination."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_rep", "Replicates per treatment combination",
-                               value = 8,min=1,width='100%')
-              )
-          )
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "Review the generated model and include interactions only when scientifically meaningful."),
-          
-          uiOutput('model_ui'),
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui')
-        ),
-        
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+        numericInput(
+          "num_trt_sub", "Subplot factors",
+          value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+          step = 1, width = "100%"
+        )
       )
-    }else if(input$design_title=='Randomized Complete Block Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the factors whose effects you want to detect."),
-          
-          div(style = "display: flex; align-items: center;width:100%;;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = "100%")
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("table-cells-large", "Blocks", "Each complete block contains every treatment combination once."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_block", "Complete blocks", value = 8,min=1,width="100%")
-              )
-          )
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model includes a random intercept for block."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+    } else {
+      numericInput(
+        "num_trt", "Treatment factors",
+        value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
+        step = 1, width = "100%"
       )
-    }else if(input$design_title=='Latin Square Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Define the treatments arranged within each square."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt", "Treatment factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width = "100%")
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("border-all", "Square replication", "Set the number of squares and whether row or column blocks repeat across them."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_squares", "Replicated squares", value = 4,min=1,width = '100%')
-              )
-          ),
-          
-          div(
-            style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-            div(
-              style='flex:1;',
-              selectInput(
-                inputId = "value_reuse",
-                label = "Blocks reused across squares",
-                choices = c("Reuse row blocks" = 'row', "Reuse column blocks" = 'col', "Use new row and column blocks" = 'none'),
-                selected = "none",
-                width = "100%")
-            ),
-            tags$span(
-              `data-toggle` = "tooltip",
-              title = "Note: 'row' for reusing row blocks, 'col' for reusing column blocks, or 'none' for reusing neither row nor column blocks to replicate a single square.",
-              style = "margin-left: 5px; cursor: pointer;",
-              icon("question-circle")
-            )
-          )),
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model includes random row and column effects."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-      )
-    }else if(input$design_title=='Split Plot Design'){
-      tagList(
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("layer-group", "Treatment structure", "Separate factors applied to whole plots from those applied within plots."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt_main", "Whole-plot factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width="100%")
-              )
-          ),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_trt_sub", "Subplot factors",
-                               value = 1, min = 1, max = MAX_TREATMENT_FACTORS,
-                               step = 1,
-                               width="100%")
-              )
-          ),
-          uiOutput("treatment_names_ui"),
-          uiOutput("treatment_names_validation")
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("users", "Whole-plot replication", "Set the number of independent whole plots assigned to each whole-plot treatment."),
-          
-          div(style = "display: flex; align-items: center;width:100%;margin-bottom: 2px;",
-              div(style="flex:1;",
-                  numericInput("num_rep", "Whole plots per whole-plot treatment",
-                               value = 10,min=1,width="100%")
-              )
-          )
-        ),
-        
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-               border-radius: 6px; padding: 2px; margin-top: 2px;",
-          section_header("diagram-project", "Analysis model", "The generated model accounts for whole-plot variation separately from residual error."),
-          
-          uiOutput('interaction_exist_ui'),
-          uiOutput('interaction_fac_ui'),
-          uiOutput('model_ui')
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
-      )
-    }else if(input$design_title=='General Design'){
-      tagList(
-        bslib::card(
+    }
+
+    div(
+      class = "workflow-section treatment-structure-section",
+      section_header("layer-group", "Treatment structure", description),
+      factor_controls,
+      uiOutput("treatment_names_ui"),
+      uiOutput("treatment_names_validation")
+    )
+  })
+
+  output$dynamic_sidebar <- renderUI({
+    req(page_started(), input$design_title)
+
+    if (input$design_title == "General Design") {
+      analysis_model <- div(
+        class = "workflow-section",
+        section_header("code", "Analysis model", "Enter the model formula and any residual correlation using columns from the design data."),
         div(
-          style = "display: flex; flex-direction: column;width:100%;",
-          section_header("file-arrow-up", "Study layout", "Upload one row per observation or planned observation, with a separate column for each design variable.")
-        ),
-        
-        div(
-          style = "display: flex; align-items: center;width:100%;",
-          div(
-            style='flex:1;',
-            fileInput(
-              inputId = "uploaded_file",
-              label = "Study data",
-              accept = c(".csv", ".xlsx",".xls", ".txt", ".tsv"),
-              buttonLabel = "Choose file",
-              placeholder = "CSV, Excel, TSV, or TXT",
-              width = "100%")
+          class = "field-with-help",
+          textInput(
+            "Formula_general", "Model formula",
+            placeholder = "For example: ~ treatment + time + (1 | subject)",
+            width = "100%"
+          ),
+          tags$span(
+            `data-toggle` = "tooltip",
+            title = "Enter the right-hand side only, beginning with ~. Random effects follow lme4 syntax, such as (1 | block).",
+            class = "field-help-icon",
+            icon("question-circle")
           )
         ),
-        field_note("The app reads the column names from this file and uses them in the model and correlation settings."),
-        
-        uiOutput("file_feedback"),
-        
-        uiOutput("file_type_check")
-        ),
-        bslib::card(
-        section_header("code", "Analysis model", "Describe fixed effects and random effects using the column names in your uploaded data."),
-        
-        div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
-            div(style="flex:1;",
-                textInput("Formula_general", "Model formula",
-                          placeholder = "For example: ~ treatment + time + (1 | subject)",width = "100%")
-            ),
-            tags$span(
-              `data-toggle` = "tooltip",
-              title = "Enter the right-hand side only, beginning with ~. Random effects follow lme4 syntax, such as (1 | block).",
-              style = "margin-left: 5px; cursor: pointer;",
-              icon("question-circle")
-            )
-        ),
-        
         uiOutput("level_numbers_validation3"),
-        
-        div(style = "font-weight: bold;display: flex; align-items: center;width:100%;",
-            div(style="flex:1;",
-                selectInput(
-                  "cor_type",
-                  "Within-group residual correlation",
-                  choices = c(
-                    "Independent residuals (none)" = "none",
-                    "AR(1): equally spaced repeated measures" = "corAR1",
-                    "ARMA: autoregressive moving average" = "corARMA",
-                    "Continuous AR(1): unequally spaced time" = "corCAR1",
-                    "Compound symmetry: constant correlation" = "corCompSymm",
-                    "Exponential spatial correlation" = "corExp",
-                    "Gaussian spatial correlation" = "corGaus",
-                    "Linear spatial correlation" = "corLin",
-                    "Unstructured correlation" = "corSymm",
-                    "Ratio-based spatial correlation" = "corRatio",
-                    "Spherical spatial correlation" = "corSpher"
-                  ),
-                  selected = "none",
-                  width = "100%"
-                )
+        div(
+          class = "field-with-help",
+          selectInput(
+            "cor_type",
+            "Within-group residual correlation",
+            choices = c(
+              "Independent residuals (none)" = "none",
+              "AR(1): equally spaced repeated measures" = "corAR1",
+              "ARMA: autoregressive moving average" = "corARMA",
+              "Continuous AR(1): unequally spaced time" = "corCAR1",
+              "Compound symmetry: constant correlation" = "corCompSymm",
+              "Exponential spatial correlation" = "corExp",
+              "Gaussian spatial correlation" = "corGaus",
+              "Linear spatial correlation" = "corLin",
+              "Unstructured correlation" = "corSymm",
+              "Ratio-based spatial correlation" = "corRatio",
+              "Spherical spatial correlation" = "corSpher"
             ),
-            tags$a(
-              href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
-              target = "_blank",
-              `data-toggle` = "tooltip",
-              `data-bs-html` = "true",
-              `data-bs-title` = "Note: Specifies residual (R-side) correlation structures using nlme::corClasses functions.<br>Click for documentation on correlation structures.",
-              style = "margin-left: 8px; color: #000; font-size: 18px;",
-              icon("question-circle")
-            )
+            selected = "none",
+            width = "100%"
+          ),
+          tags$a(
+            href = "https://www.rdocumentation.org/packages/nlme/versions/3.1-168/topics/corClasses",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            `data-toggle` = "tooltip",
+            `data-bs-html` = "true",
+            `data-bs-title` = "Specifies residual correlation using nlme::corClasses. Click for documentation.",
+            class = "field-help-icon",
+            icon("question-circle")
+          )
         ),
         field_note("Leave this as independent residuals unless observations within a subject, plot, or location are expected to remain correlated."),
         uiOutput("cor_params_ui"),
         uiOutput("cor_validation_ui")
-        ),
-        uiOutput('input_data_ui'),
-        uiOutput('input_variance_ui'),
-        tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
-        
+      )
+    } else {
+      model_description <- switch(
+        input$design_title,
+        "Randomized Complete Block Design" = "The generated model includes a random intercept for block.",
+        "Latin Square Design" = "The generated model includes random row and column effects.",
+        "Split Plot Design" = "The generated model accounts for whole-plot variation separately from residual error.",
+        "Review the generated model and include interactions only when scientifically meaningful."
+      )
+      analysis_model <- div(
+        class = "workflow-section",
+        section_header("diagram-project", "Analysis model", model_description),
+        uiOutput("interaction_exist_ui"),
+        uiOutput("interaction_fac_ui"),
+        uiOutput("model_ui")
       )
     }
+
+    div(
+      class = "assumption-sections",
+      analysis_model,
+      uiOutput("input_data_ui"),
+      uiOutput("input_variance_ui"),
+      tags$script(HTML('$(document).ready(function(){ $("[data-toggle=\'tooltip\']").tooltip(); });'))
+    )
   })
   
   naming_row <- function(prefix, index, internal, level_count, scope_label, count_id) {
@@ -1367,6 +1400,13 @@ server<-function(input,output,session) {
       div(class = "validation-error", icon("triangle-exclamation"), " ", message)
     }
   })
+
+  datavalues <- reactiveValues(
+    uploaded_data = NULL,
+    manual_data = NULL,
+    manual_data_error = NULL,
+    custom_data = NULL
+  )
   
   observeEvent(input$uploaded_file, {
     req(page_started())
@@ -1384,6 +1424,99 @@ server<-function(input,output,session) {
     })
     if (is.null(df)) return(NULL)
     datavalues$uploaded_data <- df
+    if (identical(input$custom_data_source, "upload")) {
+      datavalues$custom_data <- df
+    }
+  })
+
+  observeEvent(input$create_manual_table, {
+    req(page_started(), input$design_title == "General Design")
+    table <- tryCatch(
+      new_manual_design_table(input$manual_column_names, input$manual_row_count),
+      error = function(error) {
+        datavalues$manual_data_error <- conditionMessage(error)
+        NULL
+      }
+    )
+    if (is.null(table)) return(NULL)
+
+    datavalues$manual_data <- table
+    datavalues$manual_data_error <- manual_design_data_error(table)
+    if (identical(input$custom_data_source, "manual")) {
+      datavalues$custom_data <- NULL
+    }
+  })
+
+  output$custom_layout_table <- rhandsontable::renderRHandsontable({
+    req(page_started(), datavalues$manual_data)
+    rhandsontable::rhandsontable(
+      datavalues$manual_data,
+      rowHeaders = TRUE,
+      colHeaders = names(datavalues$manual_data),
+      stretchH = "all",
+      height = min(300, 42 + 26 * nrow(datavalues$manual_data))
+    ) %>%
+      rhandsontable::hot_table(
+        contextMenu = TRUE,
+        highlightCol = TRUE,
+        highlightRow = TRUE
+      ) %>%
+      rhandsontable::hot_context_menu(allowRowEdit = TRUE, allowColEdit = FALSE)
+  })
+
+  observeEvent(input$custom_layout_table, {
+    table <- tryCatch(
+      as.data.frame(rhandsontable::hot_to_r(input$custom_layout_table), check.names = FALSE),
+      error = function(error) NULL
+    )
+    if (is.null(table)) return(NULL)
+
+    validation_error <- manual_design_data_error(table)
+    datavalues$manual_data_error <- validation_error
+    if (identical(input$custom_data_source, "manual")) {
+      datavalues$custom_data <- if (is.null(validation_error)) table else NULL
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$custom_data_source, {
+    req(page_started(), input$design_title == "General Design")
+    values$data <- NULL
+    values$variance <- NULL
+
+    if (identical(input$custom_data_source, "upload")) {
+      datavalues$custom_data <- datavalues$uploaded_data
+      return(NULL)
+    }
+
+    table <- tryCatch(
+      if (!is.null(input$custom_layout_table)) {
+        as.data.frame(rhandsontable::hot_to_r(input$custom_layout_table), check.names = FALSE)
+      } else {
+        datavalues$manual_data
+      },
+      error = function(error) datavalues$manual_data
+    )
+    validation_error <- manual_design_data_error(table)
+    datavalues$manual_data_error <- validation_error
+    datavalues$custom_data <- if (is.null(validation_error)) table else NULL
+  }, ignoreInit = TRUE)
+
+  output$manual_table_feedback <- renderUI({
+    req(page_started(), input$custom_data_source == "manual")
+    if (is.null(datavalues$manual_data)) {
+      return(field_note("Define the columns and row count, then create the editable table."))
+    }
+    if (!is.null(datavalues$manual_data_error)) {
+      return(div(
+        class = "validation-error manual-table-feedback",
+        icon("triangle-exclamation"), " ", datavalues$manual_data_error
+      ))
+    }
+    div(
+      class = "validation-success manual-table-feedback",
+      icon("circle-check"), " Table ready: ",
+      nrow(datavalues$custom_data), " rows and ", ncol(datavalues$custom_data), " columns."
+    )
   })
   
   observeEvent(input$design_title, {
@@ -1412,21 +1545,26 @@ server<-function(input,output,session) {
   
   output$file_type_check<-renderUI({
     req(page_started())
-    req(input$uploaded_file)
+    req(datavalues$custom_data)
     
-    cols <- colnames(datavalues$uploaded_data)
+    cols <- colnames(datavalues$custom_data)
     
     type_inputs <- lapply(seq_along(cols), function(i) {
       col_name <- cols[i]
+      input_id <- paste0("factor_type_", i)
       tags$div(
-        style = "display: flex; flex-direction: column; align-items: center;",
-        
+        class = "column-role-row",
+        tags$label(
+          class = "column-role-name",
+          `for` = input_id,
+          col_name
+        ),
         selectInput(
-          inputId = paste0("factor_type_", i),
-          label = col_name,
-          choices = c("Categorical factor" = "Categorical", "Continuous covariate" = "Continuous"),
+          inputId = input_id,
+          label = NULL,
+          choices = c("Factor" = "Categorical", "Numeric" = "Numeric"),
           selected = "Categorical",
-          width = "160px"
+          width = "100%"
         )
       )
       
@@ -1457,11 +1595,10 @@ server<-function(input,output,session) {
     )
     
     tagList(
-      tags$label("Role of each data column",
+      tags$label("Column types",
                  style = "margin-bottom: 10px; display: block;font-weight: bold"),
-      field_note("Categorical columns define groups or levels; continuous columns contain numeric covariates such as time or dose."),
       div(
-        style = "font-size: 12px;display: flex; gap: 10px; overflow-x: auto; align-items: flex-end;",
+        class = "column-role-list",
         type_inputs
       ),
       hidden_text_input
@@ -1501,11 +1638,10 @@ server<-function(input,output,session) {
   
   level_nums <- reactive({
     req(page_started())
-    if (is.null(input$uploaded_file)|is.null(input$which_para)){
+    if (is.null(datavalues$custom_data) || is.null(input$which_para)){
       return(NULL)
     }else{
-      req(input$uploaded_file)
-      df <- datavalues$uploaded_data
+      df <- datavalues$custom_data
       factors <- unlist(strsplit(input$which_para, "\\:"))
       factors <- trimws(factors)
       
@@ -1515,7 +1651,7 @@ server<-function(input,output,session) {
         if (length(missing_cols) > 0) {
           div(
             style = "color: #d9534f; margin-top: 10px;",
-            paste("Use column names from the uploaded file. Not found:",
+            paste("Use column names from the design data. Not found:",
                   paste(missing_cols, collapse = ", "))
           )
         } else {
@@ -1538,10 +1674,6 @@ server<-function(input,output,session) {
     data = NULL,
     variance=NULL)
   
-  datavalues<-reactiveValues(
-    uploaded_data=NULL
-  )
-  
   observeEvent(input$design_title, {
     req(page_started())
     req(input$design_title)
@@ -1556,6 +1688,9 @@ server<-function(input,output,session) {
     req(input$design_title)
     if (input$design_title != "General Design") {
       datavalues$uploaded_data <- NULL
+      datavalues$manual_data <- NULL
+      datavalues$manual_data_error <- NULL
+      datavalues$custom_data <- NULL
     }
   })
   
@@ -1713,7 +1848,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -1898,7 +2033,7 @@ server<-function(input,output,session) {
     tryCatch(levels_vec_sub(), error = function(e) NULL),
     tryCatch(interaction_formula_number(), error = function(e) NULL),
     tryCatch(interaction_option_number(), error = function(e) NULL),
-    tryCatch(datavalues$uploaded_data, error = function(e) NULL),
+    tryCatch(datavalues$custom_data, error = function(e) NULL),
     tryCatch(input$Formula_general, error = function(e) NULL),
     tryCatch(factor_types_number(), error = function(e) NULL)
   )
@@ -1912,7 +2047,7 @@ server<-function(input,output,session) {
       req(input$level_numbers_main, input$level_numbers_sub)
     }
     if (input$design_title == 'General Design') {
-      req(input$uploaded_file)
+      req(datavalues$custom_data)
     }
     
     if(input$design_title=="Completely Randomized Design"){
@@ -2132,10 +2267,10 @@ server<-function(input,output,session) {
         values$variance<-as.matrix(df2)
       }
     }else if(input$design_title=="General Design"){
-      req(datavalues$uploaded_data)
+      req(datavalues$custom_data)
       #req(factor_types_number())
       tryCatch({
-        df<-datavalues$uploaded_data
+        df<-datavalues$custom_data
         cols <- colnames(df)
         types <- factor_types_number()
         
@@ -2144,7 +2279,7 @@ server<-function(input,output,session) {
         for (i in seq_along(cols)) {
           if (types[i] == "Categorical") {
             df[[cols[i]]] <- as.factor(df[[cols[i]]])
-          } else if (types[i] == "Continuous") {
+          } else if (types[i] == "Numeric") {
             df[[cols[i]]] <- as.numeric(df[[cols[i]]])
           }
         }
@@ -2202,7 +2337,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -2233,25 +2368,21 @@ server<-function(input,output,session) {
           "Enter the expected marginal mean at each level of every factor."
         } 
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
         note_text<-NULL
       }
       
       if(input$design_title!='General Design'){
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-          section_header("table", "Expected responses", "Use values on the same scale as the outcome you plan to analyze."),
+        div(
+          class = "workflow-section",
+          section_header("table", "Expected responses", "Enter plausible outcome means under the alternative hypothesis."),
           tags$p(note_text, class = "field-note"),
           uiOutput('design_table_ui')
         )
       }else if(input$design_title=='General Design'){
-        bslib::card(
-          style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                border-radius: 8px; padding: 10px; margin-top: 8px;
-                height: 300px; overflow-y: auto;",
-          section_header("table", "Expected responses", "Enter the expected response for every model row generated from the uploaded design."),
+        div(
+          class = "workflow-section",
+          section_header("table", "Expected responses", "Enter plausible outcome means for every model row generated from the custom design."),
           tags$p("Use estimates from prior studies, pilot data, or the smallest effects that would be scientifically meaningful.", class = "field-note"),
           uiOutput('design_table_ui')
         )
@@ -2268,13 +2399,12 @@ server<-function(input,output,session) {
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       if (is.null(values$data)) {
         return(
           div(
-            style = "height: 180px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
+            class = "table-placeholder",
             tags$em("Complete the treatment and model settings above to create the expected-response table.")
           )
         )
@@ -2311,7 +2441,7 @@ server<-function(input,output,session) {
         rowHeaders = row.names(df),
         colHeaders = colnames(df),
         stretchH = "all",
-        height = 180,
+        height = min(260, 42 + 26 * nrow(df)),
         colWidths = col_widths,
         rowHeaderWidth = row_name_width,
         digits = 2
@@ -2344,7 +2474,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL)
     )
   }, {
@@ -2359,16 +2489,14 @@ server<-function(input,output,session) {
         req(input$num_trt_sub)
         
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       
-      bslib::card(
-        style = "background-color: #f8f9fa; border: 1px solid #ddd; 
-                  border-radius: 8px; padding: 10px; margin-top: 8px;
-                  height: 240px; display: flex; flex-direction: column;",
-        section_header("wave-square", "Variation assumptions", "Enter variance estimates for each random effect and for residual error. Variances must be zero or greater."),
+      div(
+        class = "workflow-section",
+        section_header("wave-square", "Variation assumptions", "Enter variance estimates for random effects and residual error; values must be zero or greater."),
         div(
-          style = "flex: 0 0 auto; overflow-y: auto;",
+          class = "table-scroll-region",
           uiOutput('design_variance_table_ui')
         )
       )
@@ -2384,13 +2512,12 @@ server<-function(input,output,session) {
         req(input$level_numbers_sub)
         req(input$num_trt_sub)
       }else if(input$design_title=='General Design'){
-        req(datavalues$uploaded_data)
+        req(datavalues$custom_data)
       }
       if (is.null(values$variance)) {
         return(
           div(
-            style = "height: 100px; border: 1px solid #ddd; background-color: #f9f9f9; 
-                 display: flex; align-items: center; justify-content: center;",
+            class = "table-placeholder",
             tags$em("Complete the treatment and model settings above to create the variance table.")
           )
         )
@@ -2399,7 +2526,7 @@ server<-function(input,output,session) {
           rhandsontable::rHandsontableOutput("design_variance_table")
         }else if(input$design_title=="General Design"){
           if (!is.list(values$variance)) {
-            return(tags$em("Complete the uploaded-data model settings to create the variance tables."))
+            return(tags$em("Complete the custom-design model settings to create the variance tables."))
           }
           variance_list <- values$variance
           
@@ -2431,7 +2558,7 @@ server<-function(input,output,session) {
         rowHeaders = row.names(df),
         colHeaders = colnames(df),
         stretchH = "all",
-        height = 100,
+        height = min(220, 42 + 26 * nrow(df)),
         colWidths = col_widths,
         rowHeaderWidth = row_name_width,
         digits = 2
@@ -2526,8 +2653,8 @@ server<-function(input,output,session) {
     
     if (input$cor_type == "none") return(NULL)
     
-    req(datavalues$uploaded_data)
-    cols <- colnames(datavalues$uploaded_data)
+    req(datavalues$custom_data)
+    cols <- colnames(datavalues$custom_data)
     
     var_sel <- function(id, lbl, extra_none = FALSE) {
       ch <- if (extra_none) c("None" = "", cols) else cols
@@ -2614,9 +2741,9 @@ server<-function(input,output,session) {
   # corSymm: lower-triangle table UI
   output$cor_symm_table_ui <- renderUI({
     req(page_started(), input$cor_type == "corSymm")
-    req(datavalues$uploaded_data, input$cor_time)
+    req(datavalues$custom_data, input$cor_time)
     
-    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- unique(datavalues$custom_data[[input$cor_time]])
     lev <- as.character(lev[!is.na(lev)])
     m   <- length(lev)
     
@@ -2632,9 +2759,9 @@ server<-function(input,output,session) {
   
   output$cor_symm_table <- rhandsontable::renderRHandsontable({
     req(page_started(), input$cor_type == "corSymm")
-    req(datavalues$uploaded_data, input$cor_time)
+    req(datavalues$custom_data, input$cor_time)
     
-    lev <- unique(datavalues$uploaded_data[[input$cor_time]])
+    lev <- unique(datavalues$custom_data[[input$cor_time]])
     lev <- as.character(lev[!is.na(lev)])
     m   <- length(lev)
     req(m >= 2, m <= 15)
@@ -2669,9 +2796,9 @@ server<-function(input,output,session) {
   output$cor_validation_ui <- renderUI({
     req(page_started(), input$cor_type)
     if (input$cor_type == "none") return(NULL)
-    req(datavalues$uploaded_data)
+    req(datavalues$custom_data)
     
-    cols <- colnames(datavalues$uploaded_data)
+    cols <- colnames(datavalues$custom_data)
     msgs <- character(0)
     
     # Time / index variable check (for non-spatial types)
@@ -2680,31 +2807,31 @@ server<-function(input,output,session) {
       if (is.null(t) || !nzchar(t))
         msgs <- c(msgs, "Choose the column that defines time or observation order.")
       else if (!(t %in% cols))
-        msgs <- c(msgs, paste0("The selected time or sequence column is not in the uploaded data: ", t, "."))
+        msgs <- c(msgs, paste0("The selected time or sequence column is not in the design data: ", t, "."))
     }
     
     # Spatial coordinate checks
     if (input$cor_type %in% c("corExp", "corGaus", "corLin", "corRatio", "corSpher")) {
       x <- tryCatch(input$cor_x, error = function(e) NULL)
       if (is.null(x) || !(x %in% cols))
-        msgs <- c(msgs, "Choose an X-coordinate column from the uploaded data.")
+        msgs <- c(msgs, "Choose an X-coordinate column from the design data.")
       dim_val <- tryCatch(input$cor_dim, error = function(e) "1")
       if (!is.null(dim_val) && dim_val >= "2") {
         y <- tryCatch(input$cor_y, error = function(e) NULL)
         if (is.null(y) || !(y %in% cols))
-          msgs <- c(msgs, "Choose a Y-coordinate column from the uploaded data.")
+          msgs <- c(msgs, "Choose a Y-coordinate column from the design data.")
       }
       if (!is.null(dim_val) && dim_val == "3") {
         z <- tryCatch(input$cor_z, error = function(e) NULL)
         if (is.null(z) || !(z %in% cols))
-          msgs <- c(msgs, "Choose a Z-coordinate column from the uploaded data.")
+          msgs <- c(msgs, "Choose a Z-coordinate column from the design data.")
       }
     }
     
     # Grouping variable (optional)
     grp <- tryCatch(input$cor_group, error = function(e) NULL)
     if (!is.null(grp) && nzchar(grp) && !(grp %in% cols))
-      msgs <- c(msgs, paste0("The selected grouping column is not in the uploaded data: ", grp, "."))
+      msgs <- c(msgs, paste0("The selected grouping column is not in the design data: ", grp, "."))
     
     # ARMA: p+q check
     if (input$cor_type == "corARMA") {
@@ -3004,8 +3131,7 @@ server<-function(input,output,session) {
           )
         )
       }else if(input$design_title=='General Design'){
-        #req(input$uploaded_file)
-        df<-if (!is.null(input$uploaded_file)) datavalues$uploaded_data else NULL
+        df <- datavalues$custom_data
         tagList(
           div(style = "display: flex; align-items: center;flex: 1; padding-top: 2px;width:100%;",
               div(
@@ -3297,7 +3423,7 @@ server<-function(input,output,session) {
           )
         )
       }else if(input$design_title=='General Design'){
-        df<-if (!is.null(input$uploaded_file)) datavalues$uploaded_data else NULL
+        df <- datavalues$custom_data
         tagList(
           div(
             style = "flex: 1; padding-top: 2px;width:100%;",
@@ -3373,10 +3499,10 @@ server<-function(input,output,session) {
   
   output$by_validation <- renderUI({
     req(page_started())
-    if (is.null(input$uploaded_file) || is.null(input$by_para) || input$by_para == "") return(NULL)
+    if (is.null(datavalues$custom_data) || is.null(input$by_para) || input$by_para == "") return(NULL)
     if (toupper(input$by_para) == "NULL") return(NULL) 
     
-    df <- datavalues$uploaded_data
+    df <- datavalues$custom_data
     by_factors <- unlist(strsplit(input$by_para, "\\:"))
     by_factors <- trimws(by_factors)
     
@@ -3388,7 +3514,7 @@ server<-function(input,output,session) {
     
     msgs <- c()
     if (length(missing_cols) > 0) {
-      msgs <- c(msgs, paste0("Use column names from the uploaded data. Not found: ",
+      msgs <- c(msgs, paste0("Use column names from the design data. Not found: ",
                              paste(missing_cols, collapse = ", ")))
     }
     if (length(duplicated_factors) > 0) {
@@ -3534,8 +3660,8 @@ server<-function(input,output,session) {
   output$contrast_validation2 <- renderUI({
     req(page_started())
     req(input$custom_contrast, input$Contrast == 'Contrast vector')
-    req(datavalues$uploaded_data)
-    df <- datavalues$uploaded_data
+    req(datavalues$custom_data)
+    df <- datavalues$custom_data
     req(input$which_para)
     
     vec <- tryCatch({
@@ -3559,7 +3685,7 @@ server<-function(input,output,session) {
     missing_cols <- setdiff(factors, colnames(df))
     if (length(missing_cols) > 0) {
       return(tags$div(style = "color: red;", 
-                      paste("Use column names from the uploaded data. Not found:",
+                      paste("Use column names from the design data. Not found:",
                             paste(missing_cols, collapse = ", "))))
     }
     
@@ -3598,11 +3724,11 @@ server<-function(input,output,session) {
   
   output$level_numbers_validation3 <- renderUI({
     req(page_started())
-    req(datavalues$uploaded_data)
+    req(datavalues$custom_data)
     req(input$Formula_general)
     
     validation_error <- tryCatch({
-      validate_model_formula(input$Formula_general, datavalues$uploaded_data)
+      validate_model_formula(input$Formula_general, datavalues$custom_data)
       NULL
     }, error = function(error) conditionMessage(error))
     if (!is.null(validation_error)) {
@@ -3613,7 +3739,7 @@ server<-function(input,output,session) {
     }
     
     return(div(style = "color: #28a745; margin-top: 4px;",
-               "\u2713 Model formula is valid and all variables were found in the uploaded data."))
+               "\u2713 Model formula is valid and all variables were found in the design data."))
   })
 
   active_factor_count_error <- function() {
@@ -3909,8 +4035,8 @@ server<-function(input,output,session) {
           )
         }
       }else if(input$design_title=='General Design'){
-        req(input$uploaded_file, input$Formula_general)
-        df<-datavalues$uploaded_data
+        req(datavalues$custom_data, input$Formula_general)
+        df<-datavalues$custom_data
         
         cols <- colnames(df)
         types <- factor_types_number()
@@ -3918,7 +4044,7 @@ server<-function(input,output,session) {
         for (i in seq_along(cols)) {
           if (types[i] == "Categorical") {
             df[[cols[i]]] <- as.factor(df[[cols[i]]])
-          } else if (types[i] == "Continuous") {
+          } else if (types[i] == "Numeric") {
             df[[cols[i]]] <- as.numeric(df[[cols[i]]])
           }
         }
@@ -4366,7 +4492,7 @@ server<-function(input,output,session) {
       tryCatch(levels_vec_sub(), error = function(e) NULL),
       tryCatch(input$Formula_general,error=function(e) NULL),
       tryCatch(factor_types_number(),error=function(e) NULL),
-      tryCatch(datavalues$uploaded_data,error=function(e) NULL),
+      tryCatch(datavalues$custom_data,error=function(e) NULL),
       tryCatch(input$cor_type,error=function(e) NULL),
       tryCatch(active_treatment_label_spec(), error = function(e) NULL),
       tryCatch(input$design_title,error=function(e) NULL)
