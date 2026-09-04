@@ -839,7 +839,7 @@ server<-function(input,output,session) {
           tags$a(
             tagList(icon("bug"), " Report an issue"),
             class = "btn btn-light report-issue-button",
-            href = "https://github.com/WangKai7kkw/Power-analysis-APP/issues/new",
+            href = "https://github.com/WangKai7kkw/pwr4exp-app/issues/new",
             target = "_blank",
             rel = "noopener noreferrer",
             `aria-label` = "Report an issue on GitHub (opens in a new tab)"

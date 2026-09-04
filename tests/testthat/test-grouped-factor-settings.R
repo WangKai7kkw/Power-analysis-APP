@@ -13,7 +13,7 @@ test_that("the app header provides an accessible issue-reporting link", {
     expect_match(header_html, "Report an issue", fixed = TRUE)
     expect_match(
       header_html,
-      'href="https://github.com/WangKai7kkw/Power-analysis-APP/issues/new"',
+      'href="https://github.com/WangKai7kkw/pwr4exp-app/issues/new"',
       fixed = TRUE
     )
     expect_match(header_html, 'target="_blank"', fixed = TRUE)
